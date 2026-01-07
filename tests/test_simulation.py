@@ -83,5 +83,23 @@ class TestSimulation(unittest.TestCase):
         true = 2.0
         self.assertEqual(calculate_att_error(est, true), 3.0)
 
+    def test_non_linear_shift(self):
+        """Test that quadratic shift produces different external data."""
+        np.random.seed(999)
+        data_linear = create_dataset(
+            10, 10, 10, self.dim, self.shift_ext, self.beta, self.tau, shift_type="linear"
+        )
+        
+        np.random.seed(999)
+        data_quad = create_dataset(
+            10, 10, 10, self.dim, self.shift_ext, self.beta, self.tau, shift_type="quadratic"
+        )
+        
+        # External data should be different
+        self.assertFalse(np.allclose(data_linear["external"]["X"], data_quad["external"]["X"]))
+        
+        # RCT data should be identical (controlled by same seed, no shift applied)
+        self.assertTrue(np.allclose(data_linear["rct_treat"]["X"], data_quad["rct_treat"]["X"]))
+
 if __name__ == '__main__':
     unittest.main()

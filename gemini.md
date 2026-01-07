@@ -15,7 +15,8 @@ We solve this using Energy Statistics (Energy Distance) to optimize weights or s
 ## Current Status
 - Basic simulation implemented in Python (numpy/scipy).
 - 3 groups: RCT Treat, RCT Control, External.
-- Model: Linear outcome, Normal covariates.
+- Model implemented: Linear outcome, Normal covariates.
+- More complexity to be added (non-normal cov, non-normal shift, ...) 
 
 ## Constraints
 - **Code Style:** No comments in code.
