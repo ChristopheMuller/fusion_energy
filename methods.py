@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.linear_model import LogisticRegression
 from utils import compute_distance_matrix
 
 def _project_simplex(v):
@@ -31,6 +32,26 @@ def optimize_weights(X_source, X_target, max_iter=1000, tol=1e-6):
         w = w_new
             
     return w
+
+def inverse_propensity_weighting(X_source, X_target):
+    y_source = np.zeros(X_source.shape[0])
+    y_target = np.ones(X_target.shape[0])
+    
+    X_combined = np.vstack([X_source, X_target])
+    y_combined = np.concatenate([y_source, y_target])
+    
+    clf = LogisticRegression(solver='lbfgs', max_iter=1000)
+    clf.fit(X_combined, y_combined)
+    
+    propensity_scores = clf.predict_proba(X_source)[:, 1]
+    
+    propensity_scores = np.clip(propensity_scores, 0.001, 0.999)
+    
+    weights = propensity_scores / (1 - propensity_scores)
+    
+    weights = weights / np.sum(weights)
+    
+    return weights
 
 def energy_distance_unweighted(X_sample, X_target):
     n = X_sample.shape[0]

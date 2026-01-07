@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from data_gen import create_dataset
-from methods import optimize_weights, refined_sampling
+from methods import optimize_weights, refined_sampling, inverse_propensity_weighting
 from utils import compute_distance_matrix, calculate_att_error
 
 class TestSimulation(unittest.TestCase):
@@ -100,6 +100,22 @@ class TestSimulation(unittest.TestCase):
         
         # RCT data should be identical (controlled by same seed, no shift applied)
         self.assertTrue(np.allclose(data_linear["rct_treat"]["X"], data_quad["rct_treat"]["X"]))
+
+    def test_inverse_propensity_weighting(self):
+        """Test if IPW weights sum to 1 and are non-negative."""
+        X_source = self.data["external"]["X"][:50]
+        X_target = self.data["rct_treat"]["X"][:20]
+        
+        weights = inverse_propensity_weighting(X_source, X_target)
+        
+        # Check sum to 1
+        self.assertAlmostEqual(np.sum(weights), 1.0, places=5)
+        
+        # Check non-negativity
+        self.assertTrue(np.all(weights >= 0))
+        
+        # Check dimensions
+        self.assertEqual(len(weights), len(X_source))
 
 if __name__ == '__main__':
     unittest.main()

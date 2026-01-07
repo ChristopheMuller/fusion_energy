@@ -1,6 +1,6 @@
 import numpy as np
 from data_gen import create_dataset
-from methods import optimize_weights, refined_sampling
+from methods import optimize_weights, refined_sampling, inverse_propensity_weighting
 from utils import calculate_att_error
 from visualization import plot_covariate_and_outcome_distributions, plot_matched_outcomes
 
@@ -70,6 +70,12 @@ def run_simulation():
         y0_hat_sample = np.mean(Y_sample)
         att_sample = np.mean(Y_target) - y0_hat_sample
         print(f"Refined Sample ATT: {att_sample:.3f} (Error: {calculate_att_error(att_sample, TAU):.3f})")
+
+        print("\n--- Method 5: Inverse Propensity Weighting (IPW) ---")
+        weights_ipw = inverse_propensity_weighting(X_pool, X_target)
+        y0_hat_ipw = np.average(Y_pool, weights=weights_ipw)
+        att_ipw = np.mean(Y_target) - y0_hat_ipw
+        print(f"IPW ATT: {att_ipw:.3f} (Error: {calculate_att_error(att_ipw, TAU):.3f})")
 
 if __name__ == "__main__":
     run_simulation()
