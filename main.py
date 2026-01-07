@@ -2,12 +2,13 @@ import numpy as np
 from data_gen import create_dataset
 from methods import optimize_weights, refined_sampling
 from utils import calculate_att_error
+from visualization import plot_covariate_and_outcome_distributions, plot_matched_outcomes
 
 def run_simulation():
     np.random.seed(12345)
     
     N_RCT_TREAT = 200
-    N_RCT_CONTROL = 50
+    N_RCT_CONTROL = 500
     N_EXT = 5000
     K = 1000
     N_SELECT = 500
@@ -24,6 +25,8 @@ def run_simulation():
         data = create_dataset(
             N_RCT_TREAT, N_RCT_CONTROL, N_EXT, DIM, SHIFT_EXT, BETA, TAU, shift_type=shift_type
         )
+        
+        plot_covariate_and_outcome_distributions(data, save_path=f"covariate_dist_{shift_type}.png")
         
         X_target = data["rct_treat"]["X"]
         Y_target = data["rct_treat"]["Y"]
@@ -61,6 +64,9 @@ def run_simulation():
         X_sample, Y_sample = refined_sampling(
             X_pool, Y_pool, weights, X_target, n_select=N_SELECT, K=K
         )
+        
+        plot_matched_outcomes(data, Y_sample, save_path=f"matched_outcomes_{shift_type}.png")
+        
         y0_hat_sample = np.mean(Y_sample)
         att_sample = np.mean(Y_target) - y0_hat_sample
         print(f"Refined Sample ATT: {att_sample:.3f} (Error: {calculate_att_error(att_sample, TAU):.3f})")
