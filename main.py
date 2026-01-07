@@ -8,9 +8,10 @@ def run_simulation():
     
     N_RCT_TREAT = 200
     N_RCT_CONTROL = 50
-    N_EXT = 1000
+    N_EXT = 500
+    K = 1000
     DIM = 5
-    SHIFT_EXT = 1.5 
+    SHIFT_EXT = 0.5 
     BETA = np.random.uniform(-1, 1, DIM)
     TAU = 2.0 
     
@@ -53,7 +54,7 @@ def run_simulation():
     print("\n--- Method 4: Energy Weighted Refined Sampling (Best-of-K) ---")
     N_SELECT = N_RCT_TREAT 
     X_sample, Y_sample = refined_sampling(
-        X_pool, Y_pool, weights, X_target, n_select=N_SELECT, K=500
+        X_pool, Y_pool, weights, X_target, n_select=N_SELECT, K=K
     )
     y0_hat_sample = np.mean(Y_sample)
     att_sample = np.mean(Y_target) - y0_hat_sample

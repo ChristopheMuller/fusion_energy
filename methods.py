@@ -1,36 +1,36 @@
 import numpy as np
-from scipy.optimize import minimize
 from utils import compute_distance_matrix
 
-def energy_loss(w, D_xs, D_xx):
-    term1 = 2 * np.dot(w, np.mean(D_xs, axis=1))
-    term2 = np.dot(w, np.dot(D_xx, w))
-    return term1 - term2
+def _project_simplex(v):
+    n = len(v)
+    u = np.sort(v)[::-1]
+    cssv = np.cumsum(u)
+    rho = np.nonzero(u * np.arange(1, n + 1) > (cssv - 1))[0][-1]
+    theta = (cssv[rho] - 1) / (rho + 1.0)
+    return np.maximum(v - theta, 0)
 
-def optimize_weights(X_source, X_target):
+def optimize_weights(X_source, X_target, max_iter=1000, tol=1e-6):
     n_source = X_source.shape[0]
     
     D_xs = compute_distance_matrix(X_source, X_target)
     D_xx = compute_distance_matrix(X_source, X_source)
     
-    w0 = np.ones(n_source) / n_source
+    mean_D_xs = np.mean(D_xs, axis=1)
+    L = 2 * np.max(np.sum(np.abs(D_xx), axis=1))
+    lr = 1.0 / L
     
-    constraints = (
-        {'type': 'eq', 'fun': lambda w: np.sum(w) - 1}
-    )
-    bounds = [(0, 1) for _ in range(n_source)]
+    w = np.ones(n_source) / n_source
     
-    result = minimize(
-        energy_loss,
-        w0,
-        args=(D_xs, D_xx),
-        method='SLSQP',
-        bounds=bounds,
-        constraints=constraints,
-        options={'ftol': 1e-6, 'disp': False}
-    )
-    
-    return result.x
+    for _ in range(max_iter):
+        grad = 2 * mean_D_xs - 2 * D_xx.dot(w)
+        w_new = _project_simplex(w - lr * grad)
+        
+        if np.linalg.norm(w_new - w) < tol:
+            w = w_new
+            break
+        w = w_new
+            
+    return w
 
 def energy_distance_unweighted(X_sample, X_target):
     n = X_sample.shape[0]
