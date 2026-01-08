@@ -1,7 +1,7 @@
 import numpy as np
 from data_gen import create_dataset
 from methods import optimize_weights, refined_sampling, inverse_propensity_weighting
-from utils import calculate_att_error
+from utils import calculate_att_error, calculate_ess
 from visualization import plot_covariate_and_outcome_distributions, plot_matched_outcomes, plot_weight_distribution, plot_post_matching_covariates
 
 def run_simulation():
@@ -53,31 +53,36 @@ def run_simulation():
         y0_hat_naive = np.mean(Y_pool)
         att_naive = np.mean(Y_target) - y0_hat_naive
         print(f"Naive ATT: {att_naive:.3f} (Error: {calculate_att_error(att_naive, TAU):.3f})")
+
+        print("\n--- Method 3: Inverse Propensity Weighting (IPW) ---")
+        weights_ipw = inverse_propensity_weighting(X_pool, X_target)
+        ess_ipw = calculate_ess(weights_ipw)
+        y0_hat_ipw = np.average(Y_pool, weights=weights_ipw)
+        att_ipw = np.mean(Y_target) - y0_hat_ipw
+        print(f"IPW ATT: {att_ipw:.3f} (Error: {calculate_att_error(att_ipw, TAU):.3f}, ESS: {ess_ipw:.1f})")
         
-        print("\n--- Method 3: Energy Weighted Pooling ---")
+        print("\n--- Method 4: Energy Weighted Pooling ---")
         weights = optimize_weights(X_pool, X_target)
+        ess_theoretical = calculate_ess(weights)
         plot_weight_distribution(weights, save_path=f"weights_dist_{shift_type}.png")
         y0_hat_weighted = np.average(Y_pool, weights=weights)
         att_weighted = np.mean(Y_target) - y0_hat_weighted
-        print(f"Weighted ATT: {att_weighted:.3f} (Error: {calculate_att_error(att_weighted, TAU):.3f})")
+        print(f"Weighted ATT: {att_weighted:.3f} (Error: {calculate_att_error(att_weighted, TAU):.3f}, ESS: {ess_theoretical:.1f})")
         
-        print("\n--- Method 4: Energy Weighted Refined Sampling (Best-of-K) ---")
+        print("\n--- Method 5: Energy Weighted Refined Sampling (Best-of-K) ---")
         X_sample, Y_sample, selected_indices = refined_sampling(
             X_pool, Y_pool, weights, X_target, n_select=N_SELECT, K=K
         )
+        
+        unique_indices, counts = np.unique(selected_indices, return_counts=True)
+        ess_realized = calculate_ess(counts)
         
         plot_post_matching_covariates(data, selected_indices, save_path=f"post_match_covariates_{shift_type}.png")
         plot_matched_outcomes(data, Y_sample, save_path=f"matched_outcomes_{shift_type}.png")
         
         y0_hat_sample = np.mean(Y_sample)
         att_sample = np.mean(Y_target) - y0_hat_sample
-        print(f"Refined Sample ATT: {att_sample:.3f} (Error: {calculate_att_error(att_sample, TAU):.3f})")
-
-        print("\n--- Method 5: Inverse Propensity Weighting (IPW) ---")
-        weights_ipw = inverse_propensity_weighting(X_pool, X_target)
-        y0_hat_ipw = np.average(Y_pool, weights=weights_ipw)
-        att_ipw = np.mean(Y_target) - y0_hat_ipw
-        print(f"IPW ATT: {att_ipw:.3f} (Error: {calculate_att_error(att_ipw, TAU):.3f})")
+        print(f"Refined Sample ATT: {att_sample:.3f} (Error: {calculate_att_error(att_sample, TAU):.3f}, Realized ESS: {ess_realized:.1f})")
 
 if __name__ == "__main__":
     run_simulation()
