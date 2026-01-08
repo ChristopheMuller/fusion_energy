@@ -246,3 +246,27 @@ def plot_weight_distribution(weights, save_path=None):
         plt.show()
     
     plt.close()
+
+def plot_selection_counts(selected_indices, pool_size, save_path=None):
+    unique, counts = np.unique(selected_indices, return_counts=True)
+    all_counts = np.zeros(pool_size, dtype=int)
+    all_counts[unique] = counts
+    
+    sorted_counts = np.sort(all_counts)[::-1]
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(pool_size), sorted_counts, color='teal', linewidth=2)
+    plt.fill_between(range(pool_size), sorted_counts, color='teal', alpha=0.3)
+    
+    plt.xlabel("Rank")
+    plt.ylabel("Number of Selections")
+    plt.title("Distribution of Selection Counts (Energy Matching)")
+    plt.grid(True, alpha=0.3)
+    
+    if save_path:
+        plt.savefig(save_path)
+        print(f"Plot saved to {save_path}")
+    else:
+        plt.show()
+    
+    plt.close()

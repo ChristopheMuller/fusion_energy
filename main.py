@@ -2,7 +2,7 @@ import numpy as np
 from data_gen import create_dataset
 from methods import optimize_weights, refined_sampling, inverse_propensity_weighting
 from utils import calculate_att_error, calculate_ess
-from visualization import plot_covariate_and_outcome_distributions, plot_matched_outcomes, plot_weight_distribution, plot_post_matching_covariates
+from visualization import plot_covariate_and_outcome_distributions, plot_matched_outcomes, plot_weight_distribution, plot_post_matching_covariates, plot_selection_counts
 
 def run_simulation():
     np.random.seed(12345)
@@ -79,6 +79,7 @@ def run_simulation():
         
         plot_post_matching_covariates(data, selected_indices, save_path=f"post_match_covariates_{shift_type}.png")
         plot_matched_outcomes(data, Y_sample, save_path=f"matched_outcomes_{shift_type}.png")
+        plot_selection_counts(selected_indices, len(X_pool), save_path=f"selection_counts_{shift_type}.png")
         
         y0_hat_sample = np.mean(Y_sample)
         att_sample = np.mean(Y_target) - y0_hat_sample
