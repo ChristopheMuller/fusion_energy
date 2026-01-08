@@ -84,4 +84,4 @@ def refined_sampling(X_pool, Y_pool, w_opt, X_target, n_select, K=100):
             best_dist = dist
             best_indices = candidate_indices
             
-    return X_pool[best_indices], Y_pool[best_indices]
+    return X_pool[best_indices], Y_pool[best_indices], best_indices

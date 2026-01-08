@@ -2,18 +2,18 @@ import numpy as np
 from data_gen import create_dataset
 from methods import optimize_weights, refined_sampling, inverse_propensity_weighting
 from utils import calculate_att_error
-from visualization import plot_covariate_and_outcome_distributions, plot_matched_outcomes
+from visualization import plot_covariate_and_outcome_distributions, plot_matched_outcomes, plot_weight_distribution, plot_post_matching_covariates
 
 def run_simulation():
     np.random.seed(12345)
     
     N_RCT_TREAT = 200
-    N_RCT_CONTROL = 500
-    N_EXT = 5000
+    N_RCT_CONTROL = 50
+    N_EXT = 50
     K = 1000
     N_SELECT = 500
     DIM = 5
-    SHIFT_EXT = 1.5 
+    SHIFT_EXT = 1. 
     BETA = np.random.uniform(-1, 1, DIM)
     TAU = 2.0 
     
@@ -56,15 +56,17 @@ def run_simulation():
         
         print("\n--- Method 3: Energy Weighted Pooling ---")
         weights = optimize_weights(X_pool, X_target)
+        plot_weight_distribution(weights, save_path=f"weights_dist_{shift_type}.png")
         y0_hat_weighted = np.average(Y_pool, weights=weights)
         att_weighted = np.mean(Y_target) - y0_hat_weighted
         print(f"Weighted ATT: {att_weighted:.3f} (Error: {calculate_att_error(att_weighted, TAU):.3f})")
         
         print("\n--- Method 4: Energy Weighted Refined Sampling (Best-of-K) ---")
-        X_sample, Y_sample = refined_sampling(
+        X_sample, Y_sample, selected_indices = refined_sampling(
             X_pool, Y_pool, weights, X_target, n_select=N_SELECT, K=K
         )
         
+        plot_post_matching_covariates(data, selected_indices, save_path=f"post_match_covariates_{shift_type}.png")
         plot_matched_outcomes(data, Y_sample, save_path=f"matched_outcomes_{shift_type}.png")
         
         y0_hat_sample = np.mean(Y_sample)
