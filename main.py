@@ -2,6 +2,7 @@ import numpy as np
 from data_gen import create_complex_dataset
 from methods import EnergyAugmenter
 from utils import compute_energy_distance_numpy, calculate_bias_rmse
+from visualization import plot_covariate_densities, plot_outcome_densities
 import torch
 
 def run_experiment():
@@ -10,13 +11,13 @@ def run_experiment():
     
     # Settings
     N_TREAT = 200
-    N_CTRL_RCT = 50
+    N_CTRL_RCT = 200
     N_EXT_POOL = 2000
     N_AUGMENT = 150
     DIM = 5
     
     print(f"Generating Data (Dim={DIM})...")
-    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM)
+    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, rct_bias=0., ext_bias=1.5)
     
     X_t = data["target"]["X"]
     Y_t = data["target"]["Y"]
@@ -26,6 +27,21 @@ def run_experiment():
     Y_e = data["external"]["Y"]
     TAU = data["tau"]
     
+    print("Visualizing Initial Distributions...")
+    X_dict = {
+        "RCT Treatment (Target)": X_t,
+        "RCT Control (Internal)": X_i,
+        "External (Source)": X_e
+    }
+    plot_covariate_densities(X_dict, DIM)
+    
+    Y_dict = {
+        "RCT Treatment": Y_t,
+        "RCT Control": Y_i,
+        "External Control": Y_e
+    }
+    plot_outcome_densities(Y_dict)
+
     print("-" * 30)
     print("Baseline: Internal Control Only")
     att_rct = np.mean(Y_t) - np.mean(Y_i)
