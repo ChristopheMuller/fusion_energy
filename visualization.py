@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from sklearn.decomposition import PCA
 
 def plot_covariate_densities(data_dict, dim, output_dir="plots"):
     if not os.path.exists(output_dir):
@@ -48,12 +49,24 @@ def plot_outcome_densities(outcome_dict, output_dir="plots"):
 
 def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
     """
-    Scatter plot of the first 2 dimensions of covariates.
+    Scatter plot of the first 2 Principal Components (PCA).
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     plt.figure(figsize=(10, 8))
+    
+    # Concatenate all data to fit PCA on the global distribution space
+    all_data_list = [X for X in data_dict.values() if X.shape[0] > 0]
+    if not all_data_list:
+        print("No data to plot.")
+        return
+        
+    all_data = np.vstack(all_data_list)
+    
+    # Fit PCA
+    pca = PCA(n_components=2)
+    pca.fit(all_data)
     
     base_keys = [k for k in data_dict.keys() if "Matched" not in k]
     matched_keys = [k for k in data_dict.keys() if "Matched" in k]
@@ -75,27 +88,29 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
     # Plot base layers
     for label in base_keys:
         X = data_dict[label]
-        if X.shape[1] < 2:
+        if X.shape[0] == 0:
             continue
+        X_pca = pca.transform(X)
         style = get_style(label)
-        plt.scatter(X[:, 0], X[:, 1], label=label, **style)
+        plt.scatter(X_pca[:, 0], X_pca[:, 1], label=label, **style)
 
     # Plot matched overlay
     for label in matched_keys:
         X = data_dict[label]
-        if X.shape[1] < 2:
+        if X.shape[0] == 0:
             continue
+        X_pca = pca.transform(X)
         style = get_style(label)
-        plt.scatter(X[:, 0], X[:, 1], label=label, **style)
+        plt.scatter(X_pca[:, 0], X_pca[:, 1], label=label, **style)
 
-    plt.title("Covariate Scatter (Dim 0 vs Dim 1)")
-    plt.xlabel("Covariate 0")
-    plt.ylabel("Covariate 1")
+    plt.title("Covariate Scatter (PC1 vs PC2)")
+    plt.xlabel(f"PC1 ({pca.explained_variance_ratio_[0]:.1%} var)")
+    plt.ylabel(f"PC2 ({pca.explained_variance_ratio_[1]:.1%} var)")
     plt.legend()
     plt.grid(True, alpha=0.3)
-    plt.savefig(f"{output_dir}/covariate_scatter_2d.png")
+    plt.savefig(f"{output_dir}/covariate_scatter_pca.png")
     plt.close()
-    print(f"Scatter plot saved to {output_dir}/")
+    print(f"PCA scatter plot saved to {output_dir}/")
 
 def plot_simulation_boxplots(results_list, output_dir="plots"):
     """

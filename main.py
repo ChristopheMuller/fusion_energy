@@ -14,14 +14,14 @@ def run_experiment():
     
     # Settings
     N_TREAT = 200
-    N_CTRL_RCT = 50
+    N_CTRL_RCT = 100
     N_EXT_POOL = 1000
     
     # Simulation Parameters
-    N_SAMPLED_LIST = [20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400, 500]
-    K_REP = 50
+    N_SAMPLED_LIST = [20, 30, 40, 50, 75, 100, 150, 200, 300, 500]
+    K_REP = 10
     
-    DIM = 2
+    DIM = 5
     
     print(f"Generating Data (Dim={DIM})...")
     # Generate ONCE to isolate sampling variance
