@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 
 class EnergyAugmenter:
-    def __init__(self, n_augment, k_best=100, lr=0.01, n_iter=500):
+    def __init__(self, n_augment=100, k_best=100, lr=0.01, n_iter=500):
         self.n_augment = n_augment
         self.k_best = k_best
         self.lr = lr
@@ -31,64 +31,60 @@ class EnergyAugmenter:
         return term1 - term2
 
     def fit(self, X_target, X_internal, X_external):
+        # Move data to device once
         X_t = torch.tensor(X_target, dtype=torch.float32)
         X_i = torch.tensor(X_internal, dtype=torch.float32)
         X_e = torch.tensor(X_external, dtype=torch.float32)
         
         n_i = X_i.shape[0]
         n_e = X_e.shape[0]
-        total_size = n_i + n_e
+        n_t = X_t.shape[0]
         
-        # We only optimize weights for External
-        # Internal units have fixed weight proportional to their count
-        # or fixed to 1/total_size per unit. 
-        # Strategy: Optimize mixing weights for External to minimize Energy of Union.
+        # --- FIX 1: Correct Mass Ratios ---
+        # The mixture weights must reflect the FINAL COHORT composition
+        total_final_size = n_i + self.n_augment
+        alpha = n_i / total_final_size              # Mass of Internal
+        beta = self.n_augment / total_final_size    # Mass of External
         
+        # --- FIX 2: Precompute Distance Matrices (Speedup) ---
+        # 1. Internal terms (Constant)
+        d_it_mean = torch.cdist(X_i, X_t).mean()
+        d_ii_mean = torch.cdist(X_i, X_i).mean()
+        
+        # 2. Cross interaction terms (Fixed matrices)
+        d_et = torch.cdist(X_e, X_t)  # Shape (n_e, n_t)
+        d_ee = torch.cdist(X_e, X_e)  # Shape (n_e, n_e)
+        d_ie = torch.cdist(X_i, X_e)  # Shape (n_i, n_e)
+        
+        # Optimizer
         logits = torch.zeros(n_e, requires_grad=True)
         opt = torch.optim.Adam([logits], lr=self.lr)
         
-        # Fixed part of the distribution (Internal)
-        # We treat the 'sample' as a concatenation of Internal and Weighted External
-        
-        target_mass_int = n_i / total_size
-        target_mass_ext = n_e / total_size
-        
         for _ in range(self.n_iter):
             opt.zero_grad()
+            w = F.softmax(logits, dim=0) # Shape (n_e,)
             
-            w_ext_raw = F.softmax(logits, dim=0)
+            # --- TERM 1: Cross Energy (Union vs Target) ---
+            # E[||U - T||] = alpha * E[||I - T||] + beta * E[||E_w - T||]
             
-            # Combine weights: Internal (uniform) + External (learned)
-            # Rescale so they sum to 1 over the full set
+            # w.unsqueeze(1) * d_et broadcasts w to rows of d_et
+            term1_ext = torch.sum(w.unsqueeze(1) * d_et) / n_t
+            term1 = 2 * (alpha * d_it_mean + beta * term1_ext)
             
-            # Note: This is an approximation. We want the UNION to look like Target.
-            # Ideally, we sample batch from Ext using w_ext, add all Int, compute distance.
-            # Differentiable approximation: weighted average of distances.
+            # --- TERM 2: Self Energy (Union vs Union) ---
+            # (alpha*I + beta*E)^2 = alpha^2*II + beta^2*EE + 2*alpha*beta*IE
             
-            # Calculate Cross Term (Union vs Target)
-            # E[||U - T||] = (n_i * E[||I - T||] + n_e * E[||E_w - T||]) / (n_i + n_e)
+            # Weighted Energy of External
+            term2_ee = torch.sum(w.unsqueeze(1) * d_ee * w.unsqueeze(0))
             
-            d_it = torch.cdist(X_i, X_t).mean()
+            # Interaction Internal-External
+            # Mean over I (rows), Weighted Sum over E (cols)
+            # sum(d_ie * w) -> sums everything. Divide by n_i to get expectation over I.
+            term2_ie = torch.sum(d_ie * w.unsqueeze(0)) / n_i
             
-            d_et = torch.cdist(X_e, X_t)
-            term1_ext = torch.sum(w_ext_raw.unsqueeze(1) * d_et) / X_t.shape[0]
-            
-            term1 = 2 * (target_mass_int * d_it + target_mass_ext * term1_ext)
-            
-            # Calculate Self Term (Union vs Union)
-            # Decomposes into I-I, E-E, and I-E interactions
-            
-            d_ii = torch.cdist(X_i, X_i).mean()
-            
-            d_ee = torch.cdist(X_e, X_e)
-            term2_ee = torch.sum(w_ext_raw.unsqueeze(1) * d_ee * w_ext_raw.unsqueeze(0))
-            
-            d_ie = torch.cdist(X_i, X_e)
-            term2_ie = torch.sum(d_ie * w_ext_raw.unsqueeze(0)) / n_i # Mean over I, weighted sum over E
-            
-            term2 = (target_mass_int**2 * d_ii + 
-                     target_mass_ext**2 * term2_ee + 
-                     2 * target_mass_int * target_mass_ext * term2_ie)
+            term2 = (alpha**2 * d_ii_mean + 
+                     beta**2 * term2_ee + 
+                     2 * alpha * beta * term2_ie)
             
             loss = term1 - term2
             loss.backward()
