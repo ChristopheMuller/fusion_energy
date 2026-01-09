@@ -3,8 +3,8 @@ import torch
 import torch.nn.functional as F
 
 class EnergyAugmenter:
-    def __init__(self, n_augment=100, k_best=100, lr=0.01, n_iter=500):
-        self.n_augment = n_augment
+    def __init__(self, n_sampled=100, k_best=100, lr=0.01, n_iter=500):
+        self.n_sampled = n_sampled
         self.k_best = k_best
         self.lr = lr
         self.n_iter = n_iter
@@ -91,8 +91,7 @@ class EnergyAugmenter:
         pool_idx = np.arange(n_pool)
         
         # Determine total size to sample
-        # We preserve the original logic: size = n_internal + n_augment
-        total_size = n_i + self.n_augment
+        total_size = self.n_sampled
         
         # Ensure we don't sample more than available
         if total_size > n_pool:

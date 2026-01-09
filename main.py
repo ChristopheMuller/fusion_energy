@@ -1,21 +1,31 @@
 import numpy as np
 from data_gen import create_complex_dataset
 from methods import EnergyAugmenter
-from utils import compute_energy_distance_numpy, calculate_bias_rmse
-from visualization import plot_covariate_densities, plot_outcome_densities, plot_covariate_2d_scatter
-import torch
+from utils import compute_energy_distance_numpy
+from visualization import (
+    plot_covariate_densities, 
+    plot_outcome_densities, 
+    plot_covariate_2d_scatter,
+    plot_simulation_boxplots,
+    plot_mse_evolution
+)
 
 def run_experiment():
     
     # Settings
     N_TREAT = 200
-    N_CTRL_RCT = 70
+    N_CTRL_RCT = 50
     N_EXT_POOL = 1000
-    N_AUGMENT = 5
+    
+    # Simulation Parameters
+    N_SAMPLED_LIST = [20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400, 500]
+    K_REP = 50
+    
     DIM = 2
     
     print(f"Generating Data (Dim={DIM})...")
-    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, rct_bias=0, ext_bias=1.5)
+    # Generate ONCE to isolate sampling variance
+    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, rct_bias=0., ext_bias=1.0)
 
     X_t = data["target"]["X"]
     Y_t = data["target"]["Y"]
@@ -25,76 +35,85 @@ def run_experiment():
     Y_e = data["external"]["Y"]
     TAU = data["tau"]
     
-    print("Visualizing Initial Distributions...")
-    X_dict = {
-        "RCT Treatment (Target)": X_t,
-        "RCT Control (Internal)": X_i,
-        "External (Source)": X_e
-    }
-    plot_covariate_densities(X_dict, DIM)
-    
-    Y_dict = {
-        "RCT Treatment": Y_t,
-        "RCT Control": Y_i,
-        "External Control": Y_e
-    }
-    plot_outcome_densities(Y_dict)
-
-    print("-" * 30)
-    print("Baseline: Internal Control Only")
+    # Check baseline stats
     att_rct = np.mean(Y_t) - np.mean(Y_i)
-    print(f"ATT (RCT): {att_rct:.3f} --> error: {att_rct - TAU:.3f}")
-    print(f"Energy (Int vs Tgt): {compute_energy_distance_numpy(X_i, X_t):.4f}")
+    print(f"True TAU: {TAU}")
+    print(f"Baseline RCT ATT: {att_rct:.3f} (Error: {att_rct - TAU:.3f})")
+
+    simulation_results = []
     
-    print("-" * 30)
-    print("Baseline: Naive Pooling (All External)")
-    Y_pool = np.concatenate([Y_i, Y_e])
-    X_pool = np.vstack([X_i, X_e])
-    att_naive = np.mean(Y_t) - np.mean(Y_pool)
-    print(f"ATT (Naive): {att_naive:.3f} --> error: {att_naive - TAU:.3f}")
-    print(f"Energy (Pool vs Tgt): {compute_energy_distance_numpy(X_pool, X_t):.4f}")
+    print(f"Starting Simulation over N_SAMPLED={N_SAMPLED_LIST} with K_REP={K_REP}...")
+    
+    for n_samp in N_SAMPLED_LIST:
+        print(f"Processing N_SAMPLED = {n_samp}...")
+        
+        # Lists to store metrics for this n_samp
+        energies = []
+        atts = []
+        
+        # For each size, we fit the model once (weights depend on size), 
+        # or should we fit K times?
+        # "run the sampler k-times". Usually sampler implies the stochastic selection.
+        # But optimization is deterministic (seed fixed? no). 
+        # Let's re-fit to be safe, as optimization might have local minima 
+        # (though strictly convex usually for Energy... actually Energy optimization is non-convex for weights? No, it's convex for weights).
+        # However, to capture FULL variability, let's re-fit if it's fast enough. 
+        # But the prompt says "run the sampler k-times".
+        # I will fit ONCE per n_samp, then Sample K times. 
+        # This isolates the variance of the "Best-of-K" sampling procedure.
+        
+        augmenter = EnergyAugmenter(n_sampled=n_samp, k_best=200, n_iter=300)
+        augmenter.fit(X_t, X_i, X_e)
+        
+        for k in range(K_REP):
+            # Sample
+            X_final_control, Y_final_control = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
+            
+            # Compute Metrics
+            # ATT
+            att_est = np.mean(Y_t) - np.mean(Y_final_control)
+            atts.append(att_est)
+            
+            # Energy
+            en_dist = compute_energy_distance_numpy(X_final_control, X_t)
+            energies.append(en_dist)
+        
+        # Store results
+        res = {
+            'n_sample': n_samp,
+            'energies': energies,
+            'atts': atts,
+            'true_tau': TAU
+        }
+        simulation_results.append(res)
+        
+        # Print Stats
+        mean_att = np.mean(atts)
+        std_att = np.std(atts)
+        mean_en = np.mean(energies)
+        print(f"  -> Mean ATT: {mean_att:.3f} (Std: {std_att:.3f})")
+        print(f"  -> Mean Energy: {mean_en:.4f}")
 
     print("-" * 30)
-    print("Method: Energy Augmentation (Sampling w/o Replacement)")
-
-    augmenter = EnergyAugmenter(n_augment = N_AUGMENT, k_best=200)
-
-    # 1. Learn Weights (Blind to Outcome)
-    print("\tOptimizing weights...")
-    augmenter.fit(X_t, X_i, X_e)
+    print("Generating Simulation Plots...")
+    plot_simulation_boxplots(simulation_results)
+    plot_mse_evolution(simulation_results)
     
-    # 2. Sample Cohort (Blind to Outcome)
-    print("\tSampling best cohort...")
-    # New signature: sample(X_t, X_i, X_e, Y_i, Y_e) -> returns full cohort
-    X_final_control, Y_final_control = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
-    
-    # 3. Final Analysis
-    # (Variables X_final_control, Y_final_control are now directly returned)
-    
-    att_aug = np.mean(Y_t) - np.mean(Y_final_control)
-    final_dist = compute_energy_distance_numpy(X_final_control, X_t)
-
-    print(f"ATT (Augmented): {att_aug:.3f} --> error: {att_aug - TAU:.3f}")
-    print(f"Energy (Final vs Tgt): {final_dist:.4f}")
-
-    print("-" * 30)
-    print("Final Visualizations...")
-    
-    # Update dictionaries with Matched Sample
+    # Generate the single-shot visualization for the LAST configuration (largest N)
+    # just to keep the old visual outputs as well
+    print("Generating detailed plots for the last configuration...")
     X_dict_final = {
         "RCT Treatment": X_t,
         "RCT Control": X_i,
         "External": X_e,
-        "Matched Sample": X_final_control
+        "Matched Sample (Last Run)": X_final_control # From last loop iteration
     }
-    
     Y_dict_final = {
         "RCT Treatment": Y_t,
         "RCT Control": Y_i,
         "External": Y_e,
-        "Matched Sample": Y_final_control
+        "Matched Sample (Last Run)": Y_final_control
     }
-    
     plot_covariate_densities(X_dict_final, DIM)
     plot_outcome_densities(Y_dict_final)
     plot_covariate_2d_scatter(X_dict_final)

@@ -55,10 +55,6 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
 
     plt.figure(figsize=(10, 8))
     
-    # Define a rough style map or heuristics
-    # We want base layers first, then overlays
-    
-    # Separating keys to ensure order: Base groups first, then Matches
     base_keys = [k for k in data_dict.keys() if "Matched" not in k]
     matched_keys = [k for k in data_dict.keys() if "Matched" in k]
     
@@ -79,10 +75,8 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
     # Plot base layers
     for label in base_keys:
         X = data_dict[label]
-        # Only plot if we have at least 2 dims
         if X.shape[1] < 2:
             continue
-            
         style = get_style(label)
         plt.scatter(X[:, 0], X[:, 1], label=label, **style)
 
@@ -91,9 +85,7 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
         X = data_dict[label]
         if X.shape[1] < 2:
             continue
-            
         style = get_style(label)
-        # Make matched points slightly larger or distinct
         plt.scatter(X[:, 0], X[:, 1], label=label, **style)
 
     plt.title("Covariate Scatter (Dim 0 vs Dim 1)")
@@ -104,3 +96,71 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
     plt.savefig(f"{output_dir}/covariate_scatter_2d.png")
     plt.close()
     print(f"Scatter plot saved to {output_dir}/")
+
+def plot_simulation_boxplots(results_list, output_dir="plots"):
+    """
+    Plots boxplots for Energy and ATT evolution over different N_SAMPLED values.
+    results_list: List of dicts, each containing:
+        {'n_sample': int, 'energies': [...], 'atts': [...], 'true_tau': float}
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    n_samples = [r['n_sample'] for r in results_list]
+    energies_data = [r['energies'] for r in results_list]
+    atts_data = [r['atts'] for r in results_list]
+    true_tau = results_list[0]['true_tau']
+
+    # 1. Energy Boxplot
+    plt.figure(figsize=(10, 6))
+    plt.boxplot(energies_data, labels=n_samples)
+    plt.title("Evolution of Energy Distance (Bias Proxy)")
+    plt.xlabel("N_SAMPLED (Augmentation Size)")
+    plt.ylabel("Energy Distance")
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f"{output_dir}/sim_boxplot_energy.png")
+    plt.close()
+
+    # 2. ATT Boxplot
+    plt.figure(figsize=(10, 6))
+    plt.boxplot(atts_data, labels=n_samples)
+    plt.axhline(y=true_tau, color='r', linestyle='--', label=f"True ATT ({true_tau})")
+    plt.title("Evolution of ATT Estimates")
+    plt.xlabel("N_SAMPLED (Augmentation Size)")
+    plt.ylabel("Estimated ATT")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f"{output_dir}/sim_boxplot_att.png")
+    plt.close()
+    
+    print(f"Simulation boxplots saved to {output_dir}/")
+
+def plot_mse_evolution(results_list, output_dir="plots"):
+    """
+    Plots the MSE of ATT estimates as a function of n_sampled.
+    results_list: List of dicts, each containing:
+        {'n_sample': int, 'energies': [...], 'atts': [...], 'true_tau': float}
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    n_samples = [r['n_sample'] for r in results_list]
+    mses = []
+
+    for r in results_list:
+        atts = np.array(r['atts'])
+        true_tau = r['true_tau']
+        # MSE = E[(estimator - true_value)^2]
+        mse = np.mean((atts - true_tau) ** 2)
+        mses.append(mse)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(n_samples, mses, marker='o', linestyle='-', color='purple', linewidth=2)
+    plt.title("MSE of ATT Estimate vs. Augmentation Size")
+    plt.xlabel("N_SAMPLED (Augmentation Size)")
+    plt.ylabel("Mean Squared Error (MSE)")
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f"{output_dir}/sim_mse_evolution.png")
+    plt.close()
+    
+    print(f"MSE evolution plot saved to {output_dir}/")

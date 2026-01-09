@@ -20,3 +20,4 @@ We solve this using Energy Statistics (Energy Distance) to optimize weights or s
 
 ## Constraints
 - **Tools:** standard python stack (numpy, scipy).
+- **Python:** run all python script from the .venv environment.
