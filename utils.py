@@ -1,15 +1,19 @@
 import numpy as np
 from scipy.spatial.distance import cdist
 
-def compute_distance_matrix(X1, X2):
-    return cdist(X1, X2, metric='euclidean')
+def compute_energy_distance_numpy(X1, X2):
+    # Standard unweighted Energy Distance
+    n1 = X1.shape[0]
+    n2 = X2.shape[0]
+    
+    d12 = cdist(X1, X2, 'euclidean').mean()
+    d11 = cdist(X1, X1, 'euclidean').mean()
+    d22 = cdist(X2, X2, 'euclidean').mean()
+    
+    return 2 * d12 - d11 - d22
 
-def calculate_att_error(estimated_att, true_att):
-    return estimated_att - true_att
-
-def calculate_rmse(errors):
-    return np.sqrt(np.mean(np.array(errors)**2))
-
-def calculate_ess(weights):
-    weights = np.array(weights)
-    return (np.sum(weights)**2) / np.sum(weights**2)
+def calculate_bias_rmse(estimates, true_val):
+    est = np.array(estimates)
+    bias = np.mean(est) - true_val
+    rmse = np.sqrt(np.mean((est - true_val)**2))
+    return bias, rmse

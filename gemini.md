@@ -19,5 +19,4 @@ We solve this using Energy Statistics (Energy Distance) to optimize weights or s
 - More complexity to be added (non-normal cov, non-normal shift, ...) 
 
 ## Constraints
-- **Code Style:** No comments in code.
 - **Tools:** standard python stack (numpy, scipy).

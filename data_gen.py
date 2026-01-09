@@ -1,36 +1,40 @@
 import numpy as np
+import torch
 
-def generate_covariates(n_samples, dim, mean_shift=0.0, shift_type="linear"):
-    mean = np.zeros(dim) + mean_shift
-    cov = np.eye(dim)
-    X = np.random.multivariate_normal(mean, cov, n_samples)
-    
-    if shift_type == "quadratic":
-        X = X + 0.5 * (X**2 - 1)
-        
-    return X
+def generate_covariates(n, dim, mean, var=1.0):
+    cov = np.eye(dim) * var
+    return np.random.multivariate_normal(mean, cov, n)
 
-def generate_potential_outcomes(X, beta, treatment_effect):
-    n = X.shape[0]
-    noise = np.random.normal(0, 1, n)
-    Y0 = X @ beta + noise
-    Y1 = Y0 + treatment_effect
-    return Y0, Y1
+def generate_outcomes_nonlinear(X, treatment_effect):
+    # Y depends on X0 (quadratic) and interaction X1*X2
+    # X3, X4... are noise ("toenails")
+    y0 = 2.0 * (X[:, 0] - 1)**2 + 1.5 * np.sin(np.pi * X[:, 1] * X[:, 2])
+    y1 = y0 + treatment_effect
+    return y0, y1
 
-def create_dataset(n_rct_treat, n_rct_control, n_ext, dim, shift_ext, beta, tau, shift_type="linear"):
-    X_rct_1 = generate_covariates(n_rct_treat, dim, mean_shift=0.0)
-    _, Y1_rct_1 = generate_potential_outcomes(X_rct_1, beta, tau)
+def create_complex_dataset(n_treat, n_control_rct, n_external, dim, rct_bias=0.5, ext_bias=1.5):
+    # Target (RCT Treat): Centered at 1.0
+    mean_target = np.ones(dim)
+    X_target = generate_covariates(n_treat, dim, mean_target, var=1.0)
     
-    X_rct_0 = generate_covariates(n_rct_control, dim, mean_shift=0.0)
-    Y0_rct_0, _ = generate_potential_outcomes(X_rct_0, beta, tau)
+    # Internal Control: Biased (e.g. dropouts), Centered at 1.0 - bias
+    mean_control = np.ones(dim) - rct_bias
+    X_control = generate_covariates(n_control_rct, dim, mean_control, var=1.0)
     
-    X_ext = generate_covariates(n_ext, dim, mean_shift=shift_ext, shift_type=shift_type)
-    Y0_ext, _ = generate_potential_outcomes(X_ext, beta, tau)
+    # External Control: Heavily biased, Centered at 1.0 - large_bias
+    # But wider variance, so it overlaps
+    mean_ext = np.ones(dim) - ext_bias
+    X_ext = generate_covariates(n_external, dim, mean_ext, var=2.0)
     
-    data = {
-        "rct_treat": {"X": X_rct_1, "Y": Y1_rct_1, "A": 1},
-        "rct_control": {"X": X_rct_0, "Y": Y0_rct_0, "A": 0},
-        "external": {"X": X_ext, "Y": Y0_ext, "A": 0}
+    # Outcomes
+    tau = 2.5
+    _, Y_target = generate_outcomes_nonlinear(X_target, tau)
+    Y0_control, _ = generate_outcomes_nonlinear(X_control, tau)
+    Y0_ext, _ = generate_outcomes_nonlinear(X_ext, tau)
+    
+    return {
+        "target": {"X": X_target, "Y": Y_target},
+        "internal": {"X": X_control, "Y": Y0_control},
+        "external": {"X": X_ext, "Y": Y0_ext},
+        "tau": tau
     }
-    
-    return data

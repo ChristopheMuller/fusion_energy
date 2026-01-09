@@ -1,89 +1,72 @@
 import numpy as np
-from data_gen import create_dataset
-from methods import optimize_weights, refined_sampling, inverse_propensity_weighting
-from utils import calculate_att_error, calculate_ess
-from visualization import plot_covariate_and_outcome_distributions, plot_matched_outcomes, plot_weight_distribution, plot_post_matching_covariates, plot_selection_counts
+from data_gen import create_complex_dataset
+from methods import EnergyAugmenter
+from utils import compute_energy_distance_numpy, calculate_bias_rmse
+import torch
 
-def run_simulation():
-    np.random.seed(12345)
+def run_experiment():
+    np.random.seed(42)
+    torch.manual_seed(42)
     
-    N_RCT_TREAT = 200
-    N_RCT_CONTROL = 50
-    N_EXT = 50
-    K = 1000
-    N_SELECT = 500
+    # Settings
+    N_TREAT = 200
+    N_CTRL_RCT = 50
+    N_EXT_POOL = 2000
+    N_AUGMENT = 150
     DIM = 5
-    SHIFT_EXT = 1. 
-    BETA = np.random.uniform(-1, 1, DIM)
-    TAU = 2.0 
     
-    for shift_type in ["linear", "quadratic"]:
-        print(f"\n==========================================")
-        print(f"Running Simulation with Shift Type: {shift_type.upper()}")
-        print(f"==========================================")
-        
-        data = create_dataset(
-            N_RCT_TREAT, N_RCT_CONTROL, N_EXT, DIM, SHIFT_EXT, BETA, TAU, shift_type=shift_type
-        )
-        
-        plot_covariate_and_outcome_distributions(data, save_path=f"covariate_dist_{shift_type}.png")
-        
-        X_target = data["rct_treat"]["X"]
-        Y_target = data["rct_treat"]["Y"]
-        
-        X_rct_0 = data["rct_control"]["X"]
-        Y_rct_0 = data["rct_control"]["Y"]
-        
-        X_ext = data["external"]["X"]
-        Y_ext = data["external"]["Y"]
-        
-        X_pool = np.vstack([X_rct_0, X_ext])
-        Y_pool = np.concatenate([Y_rct_0, Y_ext])
-        
-        print(f"Target Size: {len(X_target)}")
-        print(f"Internal Control Size: {len(X_rct_0)}")
-        print(f"External Control Size: {len(X_ext)}")
-        
-        print("\n--- Method 1: RCT Only (Baseline) ---")
-        y0_hat_rct = np.mean(Y_rct_0)
-        att_rct = np.mean(Y_target) - y0_hat_rct
-        print(f"RCT Only ATT: {att_rct:.3f} (Error: {calculate_att_error(att_rct, TAU):.3f})")
-
-        print("\n--- Method 2: Naive Pooling ---")
-        y0_hat_naive = np.mean(Y_pool)
-        att_naive = np.mean(Y_target) - y0_hat_naive
-        print(f"Naive ATT: {att_naive:.3f} (Error: {calculate_att_error(att_naive, TAU):.3f})")
-
-        print("\n--- Method 3: Inverse Propensity Weighting (IPW) ---")
-        weights_ipw = inverse_propensity_weighting(X_pool, X_target)
-        ess_ipw = calculate_ess(weights_ipw)
-        y0_hat_ipw = np.average(Y_pool, weights=weights_ipw)
-        att_ipw = np.mean(Y_target) - y0_hat_ipw
-        print(f"IPW ATT: {att_ipw:.3f} (Error: {calculate_att_error(att_ipw, TAU):.3f}, ESS: {ess_ipw:.1f})")
-        
-        print("\n--- Method 4: Energy Weighted Pooling ---")
-        weights = optimize_weights(X_pool, X_target)
-        ess_theoretical = calculate_ess(weights)
-        plot_weight_distribution(weights, save_path=f"weights_dist_{shift_type}.png")
-        y0_hat_weighted = np.average(Y_pool, weights=weights)
-        att_weighted = np.mean(Y_target) - y0_hat_weighted
-        print(f"Weighted ATT: {att_weighted:.3f} (Error: {calculate_att_error(att_weighted, TAU):.3f}, ESS: {ess_theoretical:.1f})")
-        
-        print("\n--- Method 5: Energy Weighted Refined Sampling (Best-of-K) ---")
-        X_sample, Y_sample, selected_indices = refined_sampling(
-            X_pool, Y_pool, weights, X_target, n_select=N_SELECT, K=K
-        )
-        
-        unique_indices, counts = np.unique(selected_indices, return_counts=True)
-        ess_realized = calculate_ess(counts)
-        
-        plot_post_matching_covariates(data, selected_indices, save_path=f"post_match_covariates_{shift_type}.png")
-        plot_matched_outcomes(data, Y_sample, save_path=f"matched_outcomes_{shift_type}.png")
-        plot_selection_counts(selected_indices, len(X_pool), save_path=f"selection_counts_{shift_type}.png")
-        
-        y0_hat_sample = np.mean(Y_sample)
-        att_sample = np.mean(Y_target) - y0_hat_sample
-        print(f"Refined Sample ATT: {att_sample:.3f} (Error: {calculate_att_error(att_sample, TAU):.3f}, Realized ESS: {ess_realized:.1f})")
+    print(f"Generating Data (Dim={DIM})...")
+    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM)
+    
+    X_t = data["target"]["X"]
+    Y_t = data["target"]["Y"]
+    X_i = data["internal"]["X"]
+    Y_i = data["internal"]["Y"]
+    X_e = data["external"]["X"]
+    Y_e = data["external"]["Y"]
+    TAU = data["tau"]
+    
+    print("-" * 30)
+    print("Baseline: Internal Control Only")
+    att_rct = np.mean(Y_t) - np.mean(Y_i)
+    print(f"ATT (RCT): {att_rct:.3f} (True: {TAU})")
+    print(f"Dist (Int vs Tgt): {compute_energy_distance_numpy(X_i, X_t):.4f}")
+    
+    print("-" * 30)
+    print("Baseline: Naive Pooling (All External)")
+    Y_pool = np.concatenate([Y_i, Y_e])
+    X_pool = np.vstack([X_i, X_e])
+    att_naive = np.mean(Y_t) - np.mean(Y_pool)
+    print(f"ATT (Naive): {att_naive:.3f}")
+    print(f"Dist (Pool vs Tgt): {compute_energy_distance_numpy(X_pool, X_t):.4f}")
+    
+    print("-" * 30)
+    print("Method: Energy Augmentation (Sampling w/o Replacement)")
+    
+    augmenter = EnergyAugmenter(n_augment=N_AUGMENT, k_best=200)
+    
+    # 1. Learn Weights (Blind to Outcome)
+    print("Optimizing weights...")
+    augmenter.fit(X_t, X_i, X_e)
+    
+    # 2. Sample Cohort (Blind to Outcome)
+    print("Sampling best cohort...")
+    X_aug, Y_aug = augmenter.sample(X_t, X_i, X_e, Y_e)
+    
+    # 3. Final Analysis
+    Y_final_control = np.concatenate([Y_i, Y_aug])
+    X_final_control = np.vstack([X_i, X_aug])
+    
+    att_aug = np.mean(Y_t) - np.mean(Y_final_control)
+    final_dist = compute_energy_distance_numpy(X_final_control, X_t)
+    
+    print(f"ATT (Augmented): {att_aug:.3f}")
+    print(f"Dist (Final vs Tgt): {final_dist:.4f}")
+    
+    # Quick Check on Bias Reduction
+    bias_rct = abs(att_rct - TAU)
+    bias_aug = abs(att_aug - TAU)
+    print(f"\nBias Reduction: {100 * (bias_rct - bias_aug) / bias_rct:.1f}%")
 
 if __name__ == "__main__":
-    run_simulation()
+    run_experiment()
