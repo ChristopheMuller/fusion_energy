@@ -36,55 +36,33 @@ class EnergyAugmenter:
         X_i = torch.tensor(X_internal, dtype=torch.float32)
         X_e = torch.tensor(X_external, dtype=torch.float32)
         
-        n_i = X_i.shape[0]
-        n_e = X_e.shape[0]
+        # Pool the source data (Internal + External)
+        X_pool = torch.cat([X_i, X_e], dim=0)
+        n_pool = X_pool.shape[0]
         n_t = X_t.shape[0]
+
+        # Precompute distance matrices
+        # Pool vs Target
+        d_pt = torch.cdist(X_pool, X_t) # (n_pool, n_t)
         
-        # --- FIX 1: Correct Mass Ratios ---
-        # The mixture weights must reflect the FINAL COHORT composition
-        total_final_size = n_i + self.n_augment
-        alpha = n_i / total_final_size              # Mass of Internal
-        beta = self.n_augment / total_final_size    # Mass of External
-        
-        # --- FIX 2: Precompute Distance Matrices (Speedup) ---
-        # 1. Internal terms (Constant)
-        d_it_mean = torch.cdist(X_i, X_t).mean()
-        d_ii_mean = torch.cdist(X_i, X_i).mean()
-        
-        # 2. Cross interaction terms (Fixed matrices)
-        d_et = torch.cdist(X_e, X_t)  # Shape (n_e, n_t)
-        d_ee = torch.cdist(X_e, X_e)  # Shape (n_e, n_e)
-        d_ie = torch.cdist(X_i, X_e)  # Shape (n_i, n_e)
+        # Pool vs Pool
+        d_pp = torch.cdist(X_pool, X_pool) # (n_pool, n_pool)
         
         # Optimizer
-        logits = torch.zeros(n_e, requires_grad=True)
+        logits = torch.zeros(n_pool, requires_grad=True)
         opt = torch.optim.Adam([logits], lr=self.lr)
         
         for _ in range(self.n_iter):
             opt.zero_grad()
-            w = F.softmax(logits, dim=0) # Shape (n_e,)
+            w = F.softmax(logits, dim=0) # Shape (n_pool,)
             
-            # --- TERM 1: Cross Energy (Union vs Target) ---
-            # E[||U - T||] = alpha * E[||I - T||] + beta * E[||E_w - T||]
+            # Term 1: Cross Energy (Pool vs Target)
+            # 2 * E[||P - T||] = 2 * sum(w_i * d(p_i, t_j)) / n_t
+            term1 = 2 * torch.sum(w.unsqueeze(1) * d_pt) / n_t
             
-            # w.unsqueeze(1) * d_et broadcasts w to rows of d_et
-            term1_ext = torch.sum(w.unsqueeze(1) * d_et) / n_t
-            term1 = 2 * (alpha * d_it_mean + beta * term1_ext)
-            
-            # --- TERM 2: Self Energy (Union vs Union) ---
-            # (alpha*I + beta*E)^2 = alpha^2*II + beta^2*EE + 2*alpha*beta*IE
-            
-            # Weighted Energy of External
-            term2_ee = torch.sum(w.unsqueeze(1) * d_ee * w.unsqueeze(0))
-            
-            # Interaction Internal-External
-            # Mean over I (rows), Weighted Sum over E (cols)
-            # sum(d_ie * w) -> sums everything. Divide by n_i to get expectation over I.
-            term2_ie = torch.sum(d_ie * w.unsqueeze(0)) / n_i
-            
-            term2 = (alpha**2 * d_ii_mean + 
-                     beta**2 * term2_ee + 
-                     2 * alpha * beta * term2_ie)
+            # Term 2: Self Energy (Pool vs Pool)
+            # E[||P - P'||] = sum(w_i * w_j * d(p_i, p_j))
+            term2 = torch.sum(w.unsqueeze(1) * d_pp * w.unsqueeze(0))
             
             loss = term1 - term2
             loss.backward()
@@ -93,36 +71,57 @@ class EnergyAugmenter:
         self.weights_ = F.softmax(logits, dim=0).detach().numpy()
         return self
 
-    def sample(self, X_target, X_internal, X_external, Y_external=None):
+    def sample(self, X_target, X_internal, X_external, Y_internal=None, Y_external=None):
         # Best-of-K Selection
         best_dist = np.inf
         best_idx = None
         
         # Base probabilities from optimization
         probs = self.weights_ / np.sum(self.weights_)
-        pool_idx = np.arange(len(X_external))
         
-        X_t_torch = torch.tensor(X_target, dtype=torch.float32)
+        # Pool Data
         X_i_torch = torch.tensor(X_internal, dtype=torch.float32)
         X_e_torch = torch.tensor(X_external, dtype=torch.float32)
+        X_pool_torch = torch.cat([X_i_torch, X_e_torch], dim=0)
         
+        X_t_torch = torch.tensor(X_target, dtype=torch.float32)
+        
+        n_i = X_internal.shape[0]
+        n_pool = X_pool_torch.shape[0]
+        pool_idx = np.arange(n_pool)
+        
+        # Determine total size to sample
+        # We preserve the original logic: size = n_internal + n_augment
+        total_size = n_i + self.n_augment
+        
+        # Ensure we don't sample more than available
+        if total_size > n_pool:
+             total_size = n_pool
+
         for k in range(self.k_best):
-            # Sample WITHOUT replacement
+            # Sample WITHOUT replacement from the WHOLE pool
             chosen_idx = np.random.choice(
-                pool_idx, size=self.n_augment, replace=False, p=probs
+                pool_idx, size=total_size, replace=False, p=probs
             )
             
-            # Form the cohort: Internal + Selected External
-            X_cand = torch.cat([X_i_torch, X_e_torch[chosen_idx]])
+            # Form the cohort
+            X_cand = X_pool_torch[chosen_idx]
             
             # Compute Metric (Energy Distance to Target)
-            # Unweighted, because this is the final analysis cohort
             dist = self._energy_dist_torch(X_cand, X_t_torch).item()
             
             if dist < best_dist:
                 best_dist = dist
                 best_idx = chosen_idx
         
-        if Y_external is not None:
-            return X_external[best_idx], Y_external[best_idx]
-        return X_external[best_idx]
+        # Handle returns
+        # We need to construct the return arrays from pooled internal/external
+        X_pool = np.vstack([X_internal, X_external])
+        X_chosen = X_pool[best_idx]
+        
+        if Y_internal is not None and Y_external is not None:
+            Y_pool = np.concatenate([Y_internal, Y_external])
+            Y_chosen = Y_pool[best_idx]
+            return X_chosen, Y_chosen
+            
+        return X_chosen
