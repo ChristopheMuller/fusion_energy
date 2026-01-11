@@ -50,6 +50,11 @@ class EnergyAugmenter:
         
         # Optimizer
         logits = torch.zeros(n_pool, requires_grad=True)
+
+        with torch.no_grad():
+            logits[:X_i.shape[0]] = 1.0
+            logits[X_i.shape[0]:] = 0.0
+        
         opt = torch.optim.Adam([logits], lr=self.lr)
         
         for _ in range(self.n_iter):
