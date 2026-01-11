@@ -153,6 +153,7 @@ def plot_simulation_boxplots(results_list, output_dir="plots"):
 def plot_mse_evolution(results_list, output_dir="plots"):
     """
     Plots the MSE of ATT estimates as a function of n_sampled.
+    Also plots Bias^2 and Variance to show the decomposition: MSE = Bias^2 + Variance.
     results_list: List of dicts, each containing:
         {'n_sample': int, 'energies': [...], 'atts': [...], 'true_tau': float}
     """
@@ -161,21 +162,98 @@ def plot_mse_evolution(results_list, output_dir="plots"):
 
     n_samples = [r['n_sample'] for r in results_list]
     mses = []
+    bias_sqs = []
+    variances = []
 
     for r in results_list:
         atts = np.array(r['atts'])
         true_tau = r['true_tau']
+        
         # MSE = E[(estimator - true_value)^2]
         mse = np.mean((atts - true_tau) ** 2)
         mses.append(mse)
 
+        # Bias^2 = (E[estimator] - true_value)^2
+        bias = np.mean(atts) - true_tau
+        bias_sqs.append(bias ** 2)
+
+        # Variance = E[(estimator - E[estimator])^2]
+        variances.append(np.var(atts))
+
     plt.figure(figsize=(10, 6))
-    plt.plot(n_samples, mses, marker='o', linestyle='-', color='purple', linewidth=2)
-    plt.title("MSE of ATT Estimate vs. Augmentation Size")
+    plt.plot(n_samples, mses, marker='o', linestyle='-', color='purple', linewidth=2, label='MSE')
+    plt.plot(n_samples, bias_sqs, marker='x', linestyle='--', color='red', linewidth=1.5, label='Bias²')
+    plt.plot(n_samples, variances, marker='s', linestyle='--', color='green', linewidth=1.5, label='Variance')
+    
+    plt.title("MSE Decomposition (Bias² + Variance) vs. Augmentation Size")
     plt.xlabel("N_SAMPLED (Augmentation Size)")
-    plt.ylabel("Mean Squared Error (MSE)")
+    plt.ylabel("Error Squared")
+    plt.legend()
     plt.grid(True, alpha=0.3)
     plt.savefig(f"{output_dir}/sim_mse_evolution.png")
     plt.close()
     
     print(f"MSE evolution plot saved to {output_dir}/")
+
+def plot_mse_and_energy_evolution(results_list, output_dir="plots"):
+    """
+    Plots both MSE and Mean Energy on the same plot with dual y-axes.
+    Includes error bars (Standard Error) for both metrics.
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    n_samples = [r['n_sample'] for r in results_list]
+    
+    # Calculate MSE and its SE
+    mses = []
+    mse_se = []
+    
+    # Calculate Mean Energy and its SE
+    mean_energies = []
+    energy_se = []
+
+    for r in results_list:
+        # ATT stats
+        atts = np.array(r['atts'])
+        true_tau = r['true_tau']
+        sq_errors = (atts - true_tau) ** 2
+        
+        # MSE = Mean of squared errors
+        mse_val = np.mean(sq_errors)
+        mses.append(mse_val)
+        
+        # SE of MSE = Std(squared_errors) / sqrt(K)
+        mse_se.append(np.std(sq_errors) / np.sqrt(len(atts)))
+        
+        # Energy stats
+        energies = np.array(r['energies'])
+        mean_en = np.mean(energies)
+        mean_energies.append(mean_en)
+        
+        # SE of Energy = Std(energies) / sqrt(K)
+        energy_se.append(np.std(energies) / np.sqrt(len(energies)))
+
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+
+    # Plot MSE on Left Axis
+    color_mse = 'tab:red'
+    ax1.set_xlabel('N_SAMPLED (Augmentation Size)')
+    ax1.set_ylabel('Mean Squared Error (MSE)', color=color_mse)
+    ax1.errorbar(n_samples, mses, yerr=mse_se, color=color_mse, marker='o', label='MSE', capsize=5)
+    ax1.tick_params(axis='y', labelcolor=color_mse)
+    ax1.grid(True, alpha=0.3)
+
+    # Plot Energy on Right Axis
+    ax2 = ax1.twinx()  
+    color_energy = 'tab:blue'
+    ax2.set_ylabel('Mean Energy Distance', color=color_energy)
+    ax2.errorbar(n_samples, mean_energies, yerr=energy_se, color=color_energy, marker='s', label='Mean Energy', capsize=5, linestyle='--')
+    ax2.tick_params(axis='y', labelcolor=color_energy)
+
+    plt.title("Evolution of MSE and Energy Distance (with Standard Error)")
+    fig.tight_layout()  
+    plt.savefig(f"{output_dir}/sim_mse_energy_combined.png")
+    plt.close()
+    
+    print(f"Combined MSE and Energy plot saved to {output_dir}/")

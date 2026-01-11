@@ -7,7 +7,8 @@ from visualization import (
     plot_outcome_densities, 
     plot_covariate_2d_scatter,
     plot_simulation_boxplots,
-    plot_mse_evolution
+    plot_mse_evolution,
+    plot_mse_and_energy_evolution
 )
 
 def run_experiment():
@@ -15,17 +16,17 @@ def run_experiment():
     # Settings
     N_TREAT = 200
     N_CTRL_RCT = 100
-    N_EXT_POOL = 1000
+    N_EXT_POOL = 750
     
     # Simulation Parameters
-    N_SAMPLED_LIST = [20, 30, 40, 50, 75, 100, 150, 200, 300, 500]
+    N_SAMPLED_LIST = [20, 40, 60, 70, 80, 100, 120, 140, 160]
     K_REP = 10
     
-    DIM = 5
+    DIM = 4
     
     print(f"Generating Data (Dim={DIM})...")
     # Generate ONCE to isolate sampling variance
-    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, rct_bias=0., ext_bias=1.0)
+    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, rct_bias=0., ext_bias=10.0)
 
     X_t = data["target"]["X"]
     Y_t = data["target"]["Y"]
@@ -51,18 +52,7 @@ def run_experiment():
         energies = []
         atts = []
         
-        # For each size, we fit the model once (weights depend on size), 
-        # or should we fit K times?
-        # "run the sampler k-times". Usually sampler implies the stochastic selection.
-        # But optimization is deterministic (seed fixed? no). 
-        # Let's re-fit to be safe, as optimization might have local minima 
-        # (though strictly convex usually for Energy... actually Energy optimization is non-convex for weights? No, it's convex for weights).
-        # However, to capture FULL variability, let's re-fit if it's fast enough. 
-        # But the prompt says "run the sampler k-times".
-        # I will fit ONCE per n_samp, then Sample K times. 
-        # This isolates the variance of the "Best-of-K" sampling procedure.
-        
-        augmenter = EnergyAugmenter(n_sampled=n_samp, k_best=200, n_iter=300)
+        augmenter = EnergyAugmenter(n_sampled=n_samp, k_best=100, n_iter=300)
         augmenter.fit(X_t, X_i, X_e)
         
         for k in range(K_REP):
@@ -98,6 +88,7 @@ def run_experiment():
     print("Generating Simulation Plots...")
     plot_simulation_boxplots(simulation_results)
     plot_mse_evolution(simulation_results)
+    plot_mse_and_energy_evolution(simulation_results)
     
     # Generate the single-shot visualization for the LAST configuration (largest N)
     # just to keep the old visual outputs as well
