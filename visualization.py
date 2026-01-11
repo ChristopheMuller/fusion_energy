@@ -112,148 +112,156 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
     plt.close()
     print(f"PCA scatter plot saved to {output_dir}/")
 
-def plot_simulation_boxplots(results_list, output_dir="plots"):
+def plot_bias_variance_comparison(results_dict, output_dir="plots"):
     """
-    Plots boxplots for Energy and ATT evolution over different N_SAMPLED values.
-    results_list: List of dicts, each containing:
-        {'n_sample': int, 'energies': [...], 'atts': [...], 'true_tau': float}
+    Plots Bias and Variance evolution for multiple strategies.
+    
+    results_dict: { "Method Name": [list of result dicts] }
+    Each result dict has: 'n_sample', 'bias', 'variance', etc.
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+    
+    # Define styles
+    colors = ['blue', 'red', 'green', 'purple', 'orange', 'cyan']
+    markers = ['o', 's', '^', 'D', 'v', 'x']
+    styles = list(zip(colors, markers))
+    
+    # Plot Bias
+    plt.figure(figsize=(12, 7))
+    for i, (method_name, results_list) in enumerate(results_dict.items()):
+        n_samples = [r['n_sample'] for r in results_list]
+        bias = [np.abs(r['bias']) for r in results_list]
+        c, m = styles[i % len(styles)]
+        plt.plot(n_samples, bias, marker=m, label=f'{method_name} (|Bias|)', color=c, alpha=0.8)
 
-    n_samples = [r['n_sample'] for r in results_list]
-    energies_data = [r['energies'] for r in results_list]
-    atts_data = [r['atts'] for r in results_list]
-    true_tau = results_list[0]['true_tau']
+    plt.title("Absolute Bias Comparison")
+    plt.xlabel("N_SAMPLED")
+    plt.ylabel("|Bias|")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f"{output_dir}/bias_comparison.png")
+    plt.close()
+    
+    # Plot Variance
+    plt.figure(figsize=(12, 7))
+    for i, (method_name, results_list) in enumerate(results_dict.items()):
+        n_samples = [r['n_sample'] for r in results_list]
+        var = [r['variance'] for r in results_list]
+        c, m = styles[i % len(styles)]
+        plt.plot(n_samples, var, marker=m, label=f'{method_name} (Variance)', color=c, linestyle='--', alpha=0.8)
 
-    # 1. Energy Boxplot
-    plt.figure(figsize=(10, 6))
-    plt.boxplot(energies_data, labels=n_samples)
-    plt.title("Evolution of Energy Distance (Bias Proxy)")
-    plt.xlabel("N_SAMPLED (Augmentation Size)")
+    plt.title("Variance Comparison")
+    plt.xlabel("N_SAMPLED")
+    plt.ylabel("Variance of ATT Estimate")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f"{output_dir}/variance_comparison.png")
+    plt.close()
+    
+    print(f"Bias and Variance comparison plots saved to {output_dir}/")
+
+def plot_energy_comparison(results_dict, output_dir="plots"):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    colors = ['blue', 'red', 'green', 'purple', 'orange', 'cyan']
+    markers = ['o', 's', '^', 'D', 'v', 'x']
+    styles = list(zip(colors, markers))
+    
+    plt.figure(figsize=(12, 7))
+    
+    for i, (method_name, results_list) in enumerate(results_dict.items()):
+        n_samples = [r['n_sample'] for r in results_list]
+        en = [r['mean_energy'] for r in results_list]
+        std = [r['std_energy'] for r in results_list]
+        
+        c, m = styles[i % len(styles)]
+        
+        plt.errorbar(n_samples, en, yerr=std, fmt=f'-{m}', color=c, 
+                     label=f'{method_name}', capsize=5, alpha=0.8)
+    
+    plt.title("Energy Distance Comparison (with Std Dev)")
+    plt.xlabel("N_SAMPLED")
     plt.ylabel("Energy Distance")
-    plt.grid(True, alpha=0.3)
-    plt.savefig(f"{output_dir}/sim_boxplot_energy.png")
-    plt.close()
-
-    # 2. ATT Boxplot
-    plt.figure(figsize=(10, 6))
-    plt.boxplot(atts_data, labels=n_samples)
-    plt.axhline(y=true_tau, color='r', linestyle='--', label=f"True ATT ({true_tau})")
-    plt.title("Evolution of ATT Estimates")
-    plt.xlabel("N_SAMPLED (Augmentation Size)")
-    plt.ylabel("Estimated ATT")
     plt.legend()
     plt.grid(True, alpha=0.3)
-    plt.savefig(f"{output_dir}/sim_boxplot_att.png")
+    plt.savefig(f"{output_dir}/energy_comparison.png")
     plt.close()
     
-    print(f"Simulation boxplots saved to {output_dir}/")
+    print(f"Energy comparison plot saved to {output_dir}/")
 
-def plot_mse_evolution(results_list, output_dir="plots"):
+def plot_mse_decomposition_comparison(results_dict, output_dir="plots"):
     """
-    Plots the MSE of ATT estimates as a function of n_sampled.
-    Also plots Bias^2 and Variance to show the decomposition: MSE = Bias^2 + Variance.
-    results_list: List of dicts, each containing:
-        {'n_sample': int, 'energies': [...], 'atts': [...], 'true_tau': float}
+    Plots MSE decomposition (MSE, Bias^2, Variance) for all methods side-by-side.
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    n_methods = len(results_dict)
+    fig, axes = plt.subplots(1, n_methods, figsize=(6 * n_methods, 6), sharey=True)
+    
+    if n_methods == 1:
+        axes = [axes]
+        
+    styles = {
+        'MSE': {'color': 'purple', 'marker': 'o', 'linestyle': '-', 'linewidth': 2},
+        'Bias^2': {'color': 'red', 'marker': 'x', 'linestyle': '--', 'linewidth': 1.5},
+        'Variance': {'color': 'green', 'marker': 's', 'linestyle': '--', 'linewidth': 1.5}
+    }
+    
+    for ax, (method_name, results_list) in zip(axes, results_dict.items()):
+        n_samples = [r['n_sample'] for r in results_list]
+        bias_sq = [r['bias']**2 for r in results_list]
+        var = [r['variance'] for r in results_list]
+        mse = [b + v for b, v in zip(bias_sq, var)]
+        
+        ax.plot(n_samples, mse, label='MSE', **styles['MSE'])
+        ax.plot(n_samples, bias_sq, label='Bias²', **styles['Bias^2'])
+        ax.plot(n_samples, var, label='Variance', **styles['Variance'])
+        ax.set_title(f"{method_name}: MSE Decomposition")
+        ax.set_xlabel("N_SAMPLED")
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+        
+    axes[0].set_ylabel("Error Squared")
+    
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/mse_decomposition_comparison.png")
+    plt.close()
+    
+    print(f"MSE decomposition plot saved to {output_dir}/")
+
+def plot_att_boxplot(raw_results_dict, true_att, output_dir="plots"):
+    """
+    Plots boxplots of the ATT distribution as n increases for all methods.
+    
+    raw_results_dict: { "Method Name": { n_sample: [att_values...] } }
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    n_samples = [r['n_sample'] for r in results_list]
-    mses = []
-    bias_sqs = []
-    variances = []
-
-    for r in results_list:
-        atts = np.array(r['atts'])
-        true_tau = r['true_tau']
-        
-        # MSE = E[(estimator - true_value)^2]
-        mse = np.mean((atts - true_tau) ** 2)
-        mses.append(mse)
-
-        # Bias^2 = (E[estimator] - true_value)^2
-        bias = np.mean(atts) - true_tau
-        bias_sqs.append(bias ** 2)
-
-        # Variance = E[(estimator - E[estimator])^2]
-        variances.append(np.var(atts))
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(n_samples, mses, marker='o', linestyle='-', color='purple', linewidth=2, label='MSE')
-    plt.plot(n_samples, bias_sqs, marker='x', linestyle='--', color='red', linewidth=1.5, label='Bias²')
-    plt.plot(n_samples, variances, marker='s', linestyle='--', color='green', linewidth=1.5, label='Variance')
+    n_methods = len(raw_results_dict)
+    fig, axes = plt.subplots(1, n_methods, figsize=(6 * n_methods, 6), sharey=True)
     
-    plt.title("MSE Decomposition (Bias² + Variance) vs. Augmentation Size")
-    plt.xlabel("N_SAMPLED (Augmentation Size)")
-    plt.ylabel("Error Squared")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.savefig(f"{output_dir}/sim_mse_evolution.png")
+    if n_methods == 1:
+        axes = [axes]
+        
+    for ax, (method_name, results_map) in zip(axes, raw_results_dict.items()):
+        n_samples = sorted(results_map.keys())
+        data = [results_map[n] for n in n_samples]
+        
+        ax.boxplot(data, labels=n_samples, showfliers=True)
+        ax.axhline(y=true_att, color='red', linestyle='--', linewidth=2, label=f'True ATT ({true_att})')
+        ax.set_title(f"{method_name}: ATT Dist")
+        ax.set_xlabel("N_SAMPLED")
+        if ax == axes[0]:
+            ax.set_ylabel("Estimated ATT")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/att_boxplot_comparison.png")
     plt.close()
     
-    print(f"MSE evolution plot saved to {output_dir}/")
-
-def plot_mse_and_energy_evolution(results_list, output_dir="plots"):
-    """
-    Plots both MSE and Mean Energy on the same plot with dual y-axes.
-    Includes error bars (Standard Error) for both metrics.
-    """
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    n_samples = [r['n_sample'] for r in results_list]
-    
-    # Calculate MSE and its SE
-    mses = []
-    mse_se = []
-    
-    # Calculate Mean Energy and its SE
-    mean_energies = []
-    energy_se = []
-
-    for r in results_list:
-        # ATT stats
-        atts = np.array(r['atts'])
-        true_tau = r['true_tau']
-        sq_errors = (atts - true_tau) ** 2
-        
-        # MSE = Mean of squared errors
-        mse_val = np.mean(sq_errors)
-        mses.append(mse_val)
-        
-        # SE of MSE = Std(squared_errors) / sqrt(K)
-        mse_se.append(np.std(sq_errors) / np.sqrt(len(atts)))
-        
-        # Energy stats
-        energies = np.array(r['energies'])
-        mean_en = np.mean(energies)
-        mean_energies.append(mean_en)
-        
-        # SE of Energy = Std(energies) / sqrt(K)
-        energy_se.append(np.std(energies) / np.sqrt(len(energies)))
-
-    fig, ax1 = plt.subplots(figsize=(10, 6))
-
-    # Plot MSE on Left Axis
-    color_mse = 'tab:red'
-    ax1.set_xlabel('N_SAMPLED (Augmentation Size)')
-    ax1.set_ylabel('Mean Squared Error (MSE)', color=color_mse)
-    ax1.errorbar(n_samples, mses, yerr=mse_se, color=color_mse, marker='o', label='MSE', capsize=5)
-    ax1.tick_params(axis='y', labelcolor=color_mse)
-    ax1.grid(True, alpha=0.3)
-
-    # Plot Energy on Right Axis
-    ax2 = ax1.twinx()  
-    color_energy = 'tab:blue'
-    ax2.set_ylabel('Mean Energy Distance', color=color_energy)
-    ax2.errorbar(n_samples, mean_energies, yerr=energy_se, color=color_energy, marker='s', label='Mean Energy', capsize=5, linestyle='--')
-    ax2.tick_params(axis='y', labelcolor=color_energy)
-
-    plt.title("Evolution of MSE and Energy Distance (with Standard Error)")
-    fig.tight_layout()  
-    plt.savefig(f"{output_dir}/sim_mse_energy_combined.png")
-    plt.close()
-    
-    print(f"Combined MSE and Energy plot saved to {output_dir}/")
+    print(f"ATT boxplot comparison saved to {output_dir}/")

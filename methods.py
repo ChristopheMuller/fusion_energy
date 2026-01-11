@@ -76,56 +76,107 @@ class EnergyAugmenter:
         self.weights_ = F.softmax(logits, dim=0).detach().numpy()
         return self
 
-    def sample(self, X_target, X_internal, X_external, Y_internal=None, Y_external=None):
-        # Best-of-K Selection
-        best_dist = np.inf
-        best_idx = None
-        
+    def sample(self, X_target, X_internal, X_external, Y_internal=None, Y_external=None, strategy='weighted', n_sampled=None):
+        if self.weights_ is None:
+            raise ValueError("Must call fit() before sample()")
+            
+        # Use instance n_sampled if not provided
+        if n_sampled is None:
+            n_sampled = self.n_sampled
+            
         # Base probabilities from optimization
         probs = self.weights_ / np.sum(self.weights_)
         
-        # Pool Data
-        X_i_torch = torch.tensor(X_internal, dtype=torch.float32)
-        X_e_torch = torch.tensor(X_external, dtype=torch.float32)
-        X_pool_torch = torch.cat([X_i_torch, X_e_torch], dim=0)
+        # Pool Data for indexing
+        # X_pool is used to extract the chosen rows
+        X_pool = np.vstack([X_internal, X_external])
         
-        X_t_torch = torch.tensor(X_target, dtype=torch.float32)
-        
-        n_i = X_internal.shape[0]
-        n_pool = X_pool_torch.shape[0]
+        n_pool = X_pool.shape[0]
         pool_idx = np.arange(n_pool)
         
-        # Determine total size to sample
-        total_size = self.n_sampled
-        
         # Ensure we don't sample more than available
-        if total_size > n_pool:
-             total_size = n_pool
+        if n_sampled > n_pool:
+             n_sampled = n_pool
 
-        for k in range(self.k_best):
-            # Sample WITHOUT replacement from the WHOLE pool
-            chosen_idx = np.random.choice(
-                pool_idx, size=total_size, replace=False, p=probs
-            )
+        if strategy in ['weighted', 'top_n']:
+            if strategy == 'weighted':
+                # Sample WITHOUT replacement from the WHOLE pool
+                chosen_idx = np.random.choice(
+                    pool_idx, size=n_sampled, replace=False, p=probs
+                )
+            elif strategy == 'top_n':
+                # Select the indices with the largest weights
+                sorted_idx = np.argsort(probs)
+                chosen_idx = sorted_idx[-n_sampled:]
             
             # Form the cohort
-            X_cand = X_pool_torch[chosen_idx]
+            X_chosen = X_pool[chosen_idx]
+            if Y_internal is not None and Y_external is not None:
+                Y_pool = np.concatenate([Y_internal, Y_external])
+                Y_chosen = Y_pool[chosen_idx]
+                return X_chosen, Y_chosen
+            return X_chosen
+
+        elif strategy in ['weighted_hybrid', 'top_n_hybrid']:
+            n_internal = X_internal.shape[0]
             
-            # Compute Metric (Energy Distance to Target)
-            dist = self._energy_dist_torch(X_cand, X_t_torch).item()
+            # Split weights
+            w_int = self.weights_[:n_internal]
+            w_ext = self.weights_[n_internal:]
             
-            if dist < best_dist:
-                best_dist = dist
-                best_idx = chosen_idx
-        
-        # Handle returns
-        # We need to construct the return arrays from pooled internal/external
-        X_pool = np.vstack([X_internal, X_external])
-        X_chosen = X_pool[best_idx]
-        
-        if Y_internal is not None and Y_external is not None:
-            Y_pool = np.concatenate([Y_internal, Y_external])
-            Y_chosen = Y_pool[best_idx]
-            return X_chosen, Y_chosen
-            
-        return X_chosen
+            # Indices relative to their own arrays
+            idx_int = np.arange(n_internal)
+            n_external = X_external.shape[0]
+            idx_ext = np.arange(n_external)
+
+            # Case 1: n_sampled <= n_internal (Sample only from Internal)
+            if n_sampled <= n_internal:
+                # Renormalize internal weights
+                if w_int.sum() > 0:
+                    p_int = w_int / w_int.sum()
+                else:
+                    p_int = np.ones(n_internal) / n_internal
+                
+                if strategy == 'weighted_hybrid':
+                    chosen_int_sub_idx = np.random.choice(idx_int, size=n_sampled, replace=False, p=p_int)
+                else: # top_n_hybrid
+                    sorted_sub_idx = np.argsort(p_int)
+                    chosen_int_sub_idx = sorted_sub_idx[-n_sampled:]
+                
+                X_chosen = X_internal[chosen_int_sub_idx]
+                if Y_internal is not None:
+                    Y_chosen = Y_internal[chosen_int_sub_idx]
+                    return X_chosen, Y_chosen
+                return X_chosen
+
+            # Case 2: n_sampled > n_internal (All Internal + Sample from External)
+            else:
+                n_ext_needed = n_sampled - n_internal
+                
+                # Cap if requested more than available external
+                if n_ext_needed > n_external:
+                    n_ext_needed = n_external
+                
+                # Renormalize external weights
+                if w_ext.sum() > 0:
+                    p_ext = w_ext / w_ext.sum()
+                else:
+                    p_ext = np.ones(n_external) / n_external
+                
+                if strategy == 'weighted_hybrid':
+                    chosen_ext_sub_idx = np.random.choice(idx_ext, size=n_ext_needed, replace=False, p=p_ext)
+                else: # top_n_hybrid
+                    sorted_sub_idx = np.argsort(p_ext)
+                    chosen_ext_sub_idx = sorted_sub_idx[-n_ext_needed:]
+                
+                # Combine: All Internal + Chosen External
+                X_chosen = np.vstack([X_internal, X_external[chosen_ext_sub_idx]])
+                
+                if Y_internal is not None and Y_external is not None:
+                    Y_chosen = np.concatenate([Y_internal, Y_external[chosen_ext_sub_idx]])
+                    return X_chosen, Y_chosen
+                
+                return X_chosen
+
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}. Use 'weighted', 'top_n', 'weighted_hybrid', or 'top_n_hybrid'.")
