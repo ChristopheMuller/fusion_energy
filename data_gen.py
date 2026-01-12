@@ -29,10 +29,11 @@ def create_complex_dataset(n_treat, n_control_rct, n_external, dim, tau, rct_bia
     X_ext = generate_covariates(n_external, dim, mean_ext, var=ext_var)
 
     # Outcomes
-    _, Y_target = generate_outcomes_nonlinear(X_target, tau)
-    Y0_control, _ = generate_outcomes_nonlinear(X_control, tau)
-    Y0_ext, _ = generate_outcomes_nonlinear(X_ext, tau)
-    
+    beta = np.random.uniform(-2, 2, size=dim)
+    _, Y_target = generate_outcomes_nonlinear(X_target, tau, beta=beta)
+    Y0_control, _ = generate_outcomes_nonlinear(X_control, tau, beta=beta)
+    Y0_ext, _ = generate_outcomes_nonlinear(X_ext, tau, beta=beta)
+
     return {
         "target": {"X": X_target, "Y": Y_target},
         "internal": {"X": X_control, "Y": Y0_control},
