@@ -11,7 +11,8 @@ from visualization import (
     plot_covariate_densities, 
     plot_outcome_densities, 
     plot_covariate_2d_scatter,
-    plot_att_boxplot
+    plot_att_boxplot,
+    plot_energy_mse_method_decomposition
 )
 
 def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim):
@@ -87,7 +88,7 @@ def run_experiment():
     N_SAMPLED_LIST = np.arange(20, 155, 10).tolist()
     
     # Number of repetitions
-    K_REP = 100 
+    K_REP = 30 
     
     # Check one generation to get TAU
     temp_data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM)
@@ -178,6 +179,7 @@ def run_experiment():
     plot_bias_variance_comparison(results_dict)
     plot_energy_comparison(results_dict)
     plot_mse_decomposition_comparison(results_dict)
+    plot_energy_mse_method_decomposition(results_dict)
     plot_att_boxplot(raw_atts_dict, TAU)
     
     # Generate detailed plots for ONE representative run (locally)

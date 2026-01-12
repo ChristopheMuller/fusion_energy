@@ -265,3 +265,53 @@ def plot_att_boxplot(raw_results_dict, true_att, output_dir="plots"):
     plt.close()
     
     print(f"ATT boxplot comparison saved to {output_dir}/")
+
+def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
+    """
+    Plots MSE, Bias^2, Variance (left axis) and Energy (right axis) for each method individually.
+    Saves as energy_MSE_***.png
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    for method_name, results_list in results_dict.items():
+        n_samples = [r['n_sample'] for r in results_list]
+        bias_sq = [r['bias']**2 for r in results_list]
+        var = [r['variance'] for r in results_list]
+        mse = [b + v for b, v in zip(bias_sq, var)]
+        energy = [r['mean_energy'] for r in results_list]
+        
+        fig, ax1 = plt.subplots(figsize=(10, 6))
+        
+        # Left Axis: Errors
+        ax1.set_xlabel("N_SAMPLED")
+        ax1.set_ylabel("Error Squared (MSE components)", color='black')
+        
+        l1 = ax1.plot(n_samples, mse, label='MSE', color='purple', marker='o', linestyle='-', linewidth=2)
+        l2 = ax1.plot(n_samples, bias_sq, label='Bias²', color='red', marker='x', linestyle='--', linewidth=0.3)
+        l3 = ax1.plot(n_samples, var, label='Variance', color='green', marker='s', linestyle='--', linewidth=0.3)
+        
+        ax1.tick_params(axis='y', labelcolor='black')
+        
+        # Right Axis: Energy
+        ax2 = ax1.twinx()
+        ax2.set_ylabel("Energy Distance", color='blue')
+        l4 = ax2.plot(n_samples, energy, label='Energy', color='blue', marker='d', linestyle='-.', linewidth=1.5)
+        ax2.tick_params(axis='y', labelcolor='blue')
+        
+        # Combined Legend
+        lines = l1 + l2 + l3 + l4
+        labels = [l.get_label() for l in lines]
+        ax1.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=4)
+        
+        plt.title(f"Energy & MSE Decomposition: {method_name}")
+        ax1.grid(True, alpha=0.3)
+        plt.tight_layout()
+        
+        # Sanitize filename
+        safe_name = method_name.replace(' ', '_').replace('-', '_')
+        filename = f"energy_MSE_{safe_name}.png"
+        plt.savefig(os.path.join(output_dir, filename))
+        plt.close()
+        
+    print(f"Individual Energy & MSE plots saved to {output_dir}/energy_MSE_*.png")
