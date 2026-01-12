@@ -232,39 +232,39 @@ def plot_mse_decomposition_comparison(results_dict, output_dir="plots"):
     
     print(f"MSE decomposition plot saved to {output_dir}/")
 
-def plot_att_boxplot(raw_results_dict, true_att, output_dir="plots"):
+def plot_error_boxplot(raw_errors_dict, output_dir="plots"):
     """
-    Plots boxplots of the ATT distribution as n increases for all methods.
+    Plots boxplots of the Estimation Error (Est - True) distribution as n increases for all methods.
     
-    raw_results_dict: { "Method Name": { n_sample: [att_values...] } }
+    raw_errors_dict: { "Method Name": { n_sample: [error_values...] } }
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    n_methods = len(raw_results_dict)
+    n_methods = len(raw_errors_dict)
     fig, axes = plt.subplots(1, n_methods, figsize=(6 * n_methods, 6), sharey=True)
     
     if n_methods == 1:
         axes = [axes]
         
-    for ax, (method_name, results_map) in zip(axes, raw_results_dict.items()):
+    for ax, (method_name, results_map) in zip(axes, raw_errors_dict.items()):
         n_samples = sorted(results_map.keys())
         data = [results_map[n] for n in n_samples]
         
         ax.boxplot(data, labels=n_samples, showfliers=True)
-        ax.axhline(y=true_att, color='red', linestyle='--', linewidth=2, label=f'True ATT ({true_att})')
-        ax.set_title(f"{method_name}: ATT Dist")
+        ax.axhline(y=0.0, color='red', linestyle='--', linewidth=2, label='Zero Error')
+        ax.set_title(f"{method_name}: Error Dist")
         ax.set_xlabel("N_SAMPLED")
         if ax == axes[0]:
-            ax.set_ylabel("Estimated ATT")
+            ax.set_ylabel("Estimation Error (Est - True)")
         ax.legend()
         ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/att_boxplot_comparison.png")
+    plt.savefig(f"{output_dir}/error_boxplot_comparison.png")
     plt.close()
     
-    print(f"ATT boxplot comparison saved to {output_dir}/")
+    print(f"Error boxplot comparison saved to {output_dir}/")
 
 def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
     """

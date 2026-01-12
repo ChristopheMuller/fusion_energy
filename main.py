@@ -11,11 +11,15 @@ from visualization import (
     plot_covariate_densities, 
     plot_outcome_densities, 
     plot_covariate_2d_scatter,
-    plot_att_boxplot,
+    plot_error_boxplot,
     plot_energy_mse_method_decomposition
 )
 
-def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim):
+
+def generate_tau():
+    return 2.5
+
+def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var):
     """
     Runs a single simulation repetition:
     1. Generates a fresh dataset.
@@ -25,7 +29,8 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim):
     Returns a list of result dictionaries for each n_sampled.
     """
     # 1. Generate NEW Data
-    data = create_complex_dataset(n_treat, n_ctrl, n_ext, dim, rct_bias=0., ext_bias=1.)
+    tau = generate_tau()
+    data = create_complex_dataset(n_treat, n_ctrl, n_ext, dim, tau, rct_bias=rct_bias, ext_bias=ext_bias, rct_var=rct_var, ext_var=ext_var)
 
     X_t = data["target"]["X"]
     X_i = data["internal"]["X"]
@@ -64,6 +69,7 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim):
         
         rep_results.append({
             'n_sample': n_samp,
+            'true_tau': tau,
             'w_att': att_w,
             'w_en': en_w,
             't_att': att_t,
@@ -77,57 +83,55 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim):
     return rep_results
 
 def run_experiment():
-    # Settings
+
     N_TREAT = 1000
     N_CTRL_RCT = 50
     N_EXT_POOL = 750
     DIM = 4
-    
-    # Simulation Parameters
-    # Loop over sample sizes
+
+    RCT_BIAS = 0.0
+    EXT_BIAS = 0.0
+    RCT_VAR = 1.0
+    EXT_VAR = 2.0
+
     N_SAMPLED_LIST = np.arange(20, 155, 10).tolist()
-    
-    # Number of repetitions
     K_REP = 30 
-    
-    # Check one generation to get TAU
-    temp_data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM)
-    TAU = temp_data["tau"]
-    
+        
     print(f"Experimental Setup: N_SAMPLED={N_SAMPLED_LIST}")
     print(f"Repetitions: {K_REP}")
-    print(f"True TAU: {TAU}")
     print(f"Running in PARALLEL (Joblib)...")
 
     # Run K_REP independent simulations in parallel
-    # n_jobs=-1 uses all available cores
     all_reps_results = Parallel(n_jobs=-1, verbose=5)(
-        delayed(process_repetition)(k, N_SAMPLED_LIST, N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM)
+        delayed(process_repetition)(k, N_SAMPLED_LIST, N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, RCT_BIAS, EXT_BIAS, RCT_VAR, EXT_VAR)
         for k in range(K_REP)
     )
     
     # Aggregate results
-    # Structure: n_sample -> list of values
+    # We will store ERRORS (Est - True) instead of raw ATTs, because Tau varies.
     agg_map = defaultdict(lambda: {
-        'w_att': [], 'w_en': [], 
-        't_att': [], 't_en': [],
-        'wh_att': [], 'wh_en': [],
-        'th_att': [], 'th_en': []
+        'w_err': [], 'w_en': [], 
+        't_err': [], 't_en': [],
+        'wh_err': [], 'wh_en': [],
+        'th_err': [], 'th_en': []
     })
     
     for rep_res in all_reps_results:
         for res in rep_res:
             n = res['n_sample']
-            agg_map[n]['w_att'].append(res['w_att'])
+            tau = res['true_tau']
+            
+            agg_map[n]['w_err'].append(res['w_att'] - tau)
             agg_map[n]['w_en'].append(res['w_en'])
-            agg_map[n]['t_att'].append(res['t_att'])
+            
+            agg_map[n]['t_err'].append(res['t_att'] - tau)
             agg_map[n]['t_en'].append(res['t_en'])
-            agg_map[n]['wh_att'].append(res['wh_att'])
+            
+            agg_map[n]['wh_err'].append(res['wh_att'] - tau)
             agg_map[n]['wh_en'].append(res['wh_en'])
-            agg_map[n]['th_att'].append(res['th_att'])
+            
+            agg_map[n]['th_err'].append(res['th_att'] - tau)
             agg_map[n]['th_en'].append(res['th_en'])
-
-    # Compute Statistics and format for plotting
     
     # Containers for final stats
     methods_keys = ['w', 't', 'wh', 'th']
@@ -139,7 +143,7 @@ def run_experiment():
     }
     
     results_dict = {name: [] for name in methods_names.values()}
-    raw_atts_dict = {name: {} for name in methods_names.values()}
+    raw_errors_dict = {name: {} for name in methods_names.values()}
     
     print("-" * 30)
     print("Aggregating Results...")
@@ -150,15 +154,18 @@ def run_experiment():
         for key in methods_keys:
             name = methods_names[key]
             
-            atts = data_n[f'{key}_att']
+            errors = data_n[f'{key}_err']
             energies = data_n[f'{key}_en']
             
-            # Store raw ATTs for boxplot
-            raw_atts_dict[name][n_samp] = atts
+            # Store raw Errors for boxplot
+            raw_errors_dict[name][n_samp] = errors
 
-            # Compute Stats
-            bias = np.mean(atts) - TAU
-            var = np.var(atts)
+            # Compute Stats based on ERRORS
+            # Bias = Mean of (Est - True)
+            bias = np.mean(errors)
+            # Variance = Var of (Est - True) -> This correctly captures estimator variance
+            var = np.var(errors)
+            
             mean_en = np.mean(energies)
             std_en = np.std(energies)
             
@@ -180,11 +187,12 @@ def run_experiment():
     plot_energy_comparison(results_dict)
     plot_mse_decomposition_comparison(results_dict)
     plot_energy_mse_method_decomposition(results_dict)
-    plot_att_boxplot(raw_atts_dict, TAU)
+    plot_error_boxplot(raw_errors_dict)
     
     # Generate detailed plots for ONE representative run (locally)
     print("Generating detailed density plots for a single example run...")
-    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, rct_bias=0., ext_bias=0.0)
+    tau = generate_tau()
+    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, tau, rct_bias=RCT_BIAS, ext_bias=EXT_BIAS, rct_var=RCT_VAR, ext_var=EXT_VAR)
     
     X_t = data["target"]["X"]
     Y_t = data["target"]["Y"]
