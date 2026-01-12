@@ -48,34 +48,36 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
         X_w, Y_w = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
         
         att_w = np.mean(Y_t) - np.mean(Y_w)
-        en_w = compute_energy_distance_numpy(X_w, X_t)
+        en_w, d12, d11, d22 = compute_energy_distance_numpy(X_w, X_t)
         
         rep_results.append({
             'n_sample': n_samp,
             'true_tau': tau,
             'att': att_w,
-            'en': en_w
+            'en': en_w,
+            'd12': d12,
+            'd11': d11,
+            'd22': d22
         })
         
     return rep_results
 
 def run_experiment():
 
-    N_TREAT = 1000
-    N_CTRL_RCT = 50
+    N_TREAT = 150
+    N_CTRL_RCT = 20
     N_EXT_POOL = 1000
-    DIM = 4
 
-    RCT_BIAS = 0.0
-    EXT_BIAS = 1.0
+    DIM = 3
+
+    RCT_BIAS = 0.
+    EXT_BIAS = 0.6
     RCT_VAR = 1.0
-    EXT_VAR = 2.0
+    EXT_VAR = 1.0
 
     # Restoring full experiment settings
-    # N_SAMPLED_LIST = np.arange(20, 155, 10).tolist()
-    # K_REP = 30 
-    N_SAMPLED_LIST = [0, 5, 10, 15, 20, 25, 30]
-    K_REP = 10
+    N_SAMPLED_LIST = [0, 5, 10, 20, 30, 50, 100]
+    K_REP = 100
         
     print(f"Experimental Setup: N_SAMPLED={N_SAMPLED_LIST}")
     print(f"Repetitions: {K_REP}")
@@ -155,7 +157,7 @@ def run_experiment():
     
     # Use the largest sample size for the density plot visualization
     last_n = N_SAMPLED_LIST[-1]
-    augmenter = EnergyAugmenter_Weighted(n_sampled=last_n, k_best=50, lr=0.01, n_iter=200) 
+    augmenter = EnergyAugmenter_Weighted(n_sampled=last_n, k_best=1, lr=0.01, n_iter=200) 
     augmenter.fit(X_t, X_i, X_e)
     X_w, Y_w = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
     
@@ -173,7 +175,8 @@ def run_experiment():
     }
     plot_covariate_densities(X_dict_final, DIM)
     plot_outcome_densities(Y_dict_final)
-    plot_covariate_2d_scatter(X_dict_final)
+    if DIM >= 2:
+        plot_covariate_2d_scatter(X_dict_final)
 
 if __name__ == "__main__":
     run_experiment()

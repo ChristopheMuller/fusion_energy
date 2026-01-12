@@ -11,61 +11,71 @@ class EnergyAugmenter_Weighted:
         self.weights_ = None
         
     def fit(self, X_target, X_internal, X_external):
-        X_t = torch.tensor(X_target, dtype=torch.float32)
-        X_i = torch.tensor(X_internal, dtype=torch.float32)
-        X_e = torch.tensor(X_external, dtype=torch.float32)
+        # 1. Move to tensor (ensure device is consistent)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        X_t = torch.tensor(X_target, dtype=torch.float32, device=device)
+        X_i = torch.tensor(X_internal, dtype=torch.float32, device=device)
+        X_e = torch.tensor(X_external, dtype=torch.float32, device=device)
         
         n_i = X_i.shape[0]
         n_e = X_e.shape[0]
         n_t = X_t.shape[0]
         
         total_final = n_i + self.n_sampled
-        alpha = n_i / total_final
+        # alpha = n_i / total_final  <-- Constant scaling factors
         beta = self.n_sampled / total_final
 
-        # 1. Internal vs Target (Constant bias)
-        d_it_mean = torch.cdist(X_i, X_t).mean()
+        # 2. Pre-compute Constant Summaries (The "Heavy Lifting")
+        # Instead of summing inside the loop, we sum ONCE here.
         
-        # 2. Internal vs Internal (Constant variance)
-        d_ii_mean = torch.cdist(X_i, X_i).mean()
-        
-        # 3. External matrices
+        # Term 1 Part: External vs Target
+        # Original: sum(w * d_et) 
+        # Optimized: w * sum(d_et, dim=1)
         d_et = torch.cdist(X_e, X_t)
-        d_ee = torch.cdist(X_e, X_e)
-        d_ie = torch.cdist(X_i, X_e)
+        d_et_sum = d_et.sum(dim=1)  # Shape (N_e,)
 
-        logits = torch.zeros(n_e, requires_grad=True)
+        # Term 2 Part: Internal vs External
+        # Original: sum(d_ie * w)
+        # Optimized: w * sum(d_ie, dim=0)
+        d_ie = torch.cdist(X_i, X_e)
+        d_ie_sum = d_ie.sum(dim=0)  # Shape (N_e,)
+        
+        # Term 2 Part: External vs External (Quadratic)
+        # We need the full matrix for w^T * D * w, but we compute it once.
+        d_ee = torch.cdist(X_e, X_e)
+
+        # 3. Optimization Loop (Now strictly O(N_e^2) or O(N_e))
+        logits = torch.zeros(n_e, requires_grad=True, device=device)
         opt = torch.optim.Adam([logits], lr=self.lr)
         
         for _ in range(self.n_iter):
             opt.zero_grad()
-            w = F.softmax(logits, dim=0) # Weights for External ONLY
+            w = F.softmax(logits, dim=0)
             
-            # --- Term 1: Cross Energy (Union vs Target) ---
-            # E[U-T] = alpha * E[I-T] + beta * E[E_w - T]
-            term1_ext = torch.sum(w.unsqueeze(1) * d_et) / n_t
-            term1 = 2 * (alpha * d_it_mean + beta * term1_ext)
+            # --- Term 1: Cross Energy ---
+            # We removed the constant (alpha * d_it_mean) as it has 0 gradient
+            # Dot product is much faster than matrix broadcasting
+            term1_ext = torch.dot(w, d_et_sum) / n_t
+            term1 = 2 * beta * term1_ext
             
-            # --- Term 2: Self Energy (Union vs Union) ---
-            # E[U-U] = alpha^2 E[I-I] + beta^2 E[E_w - E_w] + 2 alpha beta E[I - E_w]
+            # --- Term 2: Self Energy ---
+            # We removed the constant (alpha^2 * d_ii_mean)
             
-            # External self-interaction
-            term2_ee = torch.sum(w.unsqueeze(1) * d_ee * w.unsqueeze(0))
+            # External self-interaction: w^T * D_ee * w
+            # torch.mv(matrix, vector) is faster than broadcasting
+            term2_ee = torch.dot(w, torch.mv(d_ee, w))
             
-            # Interaction Internal-External (Key for balancing!)
-            # We average over Internal (fixed), sum weighted External
-            term2_ie = torch.sum(d_ie * w.unsqueeze(0)) / n_i
+            # Internal-External interaction: Dot product
+            term2_ie = torch.dot(w, d_ie_sum) / n_i
             
-            term2 = (alpha**2 * d_ii_mean + 
-                     beta**2 * term2_ee + 
-                     2 * alpha * beta * term2_ie)
+            term2 = (beta**2 * term2_ee + 
+                     2 * (1 - beta) * beta * term2_ie) # Note: alpha = 1 - beta
             
             loss = term1 - term2
             loss.backward()
             opt.step()
             
-        self.weights_ = F.softmax(logits, dim=0).detach().numpy()
-        
+        self.weights_ = F.softmax(logits, dim=0).detach().cpu().numpy()
         return self
 
     def sample(self, X_target, X_internal, X_external, Y_internal=None, Y_external=None):
