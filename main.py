@@ -68,7 +68,7 @@ def run_experiment():
     N_CTRL_RCT = 20
     N_EXT_POOL = 1000
 
-    DIM = 3
+    DIM = 5
 
     RCT_BIAS = 0.
     EXT_BIAS = 0.6
@@ -91,7 +91,7 @@ def run_experiment():
     
     # Aggregate results
     agg_map = defaultdict(lambda: {
-        'err': [], 'en': []
+        'err': [], 'en': [], 'd12': [], 'd11': [], 'd22': []
     })
     
     for rep_res in all_reps_results:
@@ -100,6 +100,9 @@ def run_experiment():
             tau = res['true_tau']
             agg_map[n]['err'].append(res['att'] - tau)
             agg_map[n]['en'].append(res['en'])
+            agg_map[n]['d12'].append(res['d12'])
+            agg_map[n]['d11'].append(res['d11'])
+            agg_map[n]['d22'].append(res['d22'])
     
     # Containers for final stats
     method_name = "Weighted"
@@ -123,13 +126,19 @@ def run_experiment():
         var = np.var(errors)
         mean_en = np.mean(energies)
         std_en = np.std(energies)
+        mean_d12 = np.mean(data_n['d12'])
+        mean_d11 = np.mean(data_n['d11'])
+        mean_d22 = np.mean(data_n['d22'])
         
         results_dict[method_name].append({
             'n_sample': n_samp,
             'bias': bias,
             'variance': var,
             'mean_energy': mean_en,
-            'std_energy': std_en
+            'std_energy': std_en,
+            'mean_d12': mean_d12,
+            'mean_d11': mean_d11,
+            'mean_d22': mean_d22
         })
         
         print(f"N={n_samp}: Bias={bias:.3f} Var={var:.3f}")

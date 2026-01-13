@@ -169,7 +169,10 @@ def plot_energy_comparison(results_dict, output_dir="plots"):
     markers = ['o', 's', '^', 'D', 'v', 'x']
     styles = list(zip(colors, markers))
     
-    plt.figure(figsize=(12, 7))
+    fig, ax1 = plt.subplots(figsize=(12, 7))
+    ax2 = ax1.twinx()
+    
+    lines = []
     
     for i, (method_name, results_list) in enumerate(results_dict.items()):
         n_samples = [r['n_sample'] for r in results_list]
@@ -178,14 +181,36 @@ def plot_energy_comparison(results_dict, output_dir="plots"):
         
         c, m = styles[i % len(styles)]
         
-        plt.errorbar(n_samples, en, yerr=std, fmt=f'-{m}', color=c, 
-                     label=f'{method_name}', capsize=5, alpha=0.8)
+        # Plot Total Energy on Left Axis
+        l_en = ax1.errorbar(n_samples, en, yerr=std, fmt=f'-{m}', color=c, 
+                     label=f'{method_name} (Total Energy)', capsize=5, alpha=0.8, linewidth=2)
+        lines.append(l_en)
+        
+        # Add decomposition on Right Axis if available
+        if all(k in results_list[0] for k in ['mean_d12', 'mean_d11']):
+            d12 = [r['mean_d12'] for r in results_list]
+            d11 = [r['mean_d11'] for r in results_list]
+            
+            l_d12, = ax2.plot(n_samples, d12, linestyle='--', color=c, alpha=0.5, label=f'{method_name}: d12')
+            l_d11, = ax2.plot(n_samples, d11, linestyle=':', color=c, alpha=0.5, label=f'{method_name}: d11')
+            lines.extend([l_d12, l_d11])
     
-    plt.title("Energy Distance Comparison (with Std Dev)")
-    plt.xlabel("N_SAMPLED")
-    plt.ylabel("Energy Distance")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
+    ax1.set_xlabel("N_SAMPLED")
+    ax1.set_ylabel("Total Energy Distance")
+    ax2.set_ylabel("Component Distances (d12, d11)")
+    
+    plt.title("Energy Distance Comparison & Decomposition")
+    
+    # Combined Legend
+    # ErrorbarContainer (l_en) does not support get_label() directly in some versions, but we can extract handles
+    # or just use the handles returned.
+    
+    # Simply using fig.legend or extracting handles from axes
+    h1, l1 = ax1.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax1.legend(h1 + h2, l1 + l2, loc='upper right', fontsize='small', ncol=2)
+    
+    ax1.grid(True, alpha=0.3)
     plt.savefig(f"{output_dir}/energy_comparison.png")
     plt.close()
     
