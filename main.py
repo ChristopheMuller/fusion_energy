@@ -2,7 +2,7 @@ import numpy as np
 from joblib import Parallel, delayed
 from collections import defaultdict
 from data_gen import create_complex_dataset
-from methods import EnergyAugmenter_Weighted, EnergyAugmenter_PooledTarget, EnergyAugmenter_Regularized
+from methods import EnergyAugmenter_Weighted, EnergyAugmenter_PooledTarget, EnergyAugmenter_Regularized, IPWAugmenter
 from utils import compute_energy_distance_numpy
 from visualization import (
     plot_bias_variance_comparison,
@@ -17,8 +17,8 @@ from visualization import (
 # --- Global Configuration ---
 METHODS_CONFIG = {
     "Weighted_001k": (EnergyAugmenter_Weighted, {'k_best': 1}),
-    "Weighted_010k": (EnergyAugmenter_Weighted, {'k_best': 10}),
-    "Weighted_100k": (EnergyAugmenter_Weighted, { 'k_best': 100})
+    "Weighted_100k": (EnergyAugmenter_Weighted, { 'k_best': 100}),
+    "IPW": (IPWAugmenter, {})
 }
 
 def generate_tau():
@@ -48,7 +48,6 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
     for n_samp in n_sampled_list:
         for method_name, (MethodClass, kwargs) in METHODS_CONFIG.items():
             # 2. Fit and Sample Method for each n_sampled
-            # Note: We pass n_sampled here. Ideally k_best is also passed if it's in kwargs.
             augmenter = MethodClass(n_sampled=n_samp, lr=0.01, n_iter=200, **kwargs) 
             augmenter.fit(X_t, X_i, X_e)
             
@@ -60,6 +59,8 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
             mu_control_weighted = np.sum(weights * Y_control_full)
             
             att_w = np.mean(Y_t) - mu_control_weighted            
+            
+            # Handle Energy Calculation (might be None for IPW)
             en_w, d12, d11, d22 = compute_energy_distance_numpy(X_w, X_t)
             
             rep_results.append({
@@ -81,7 +82,7 @@ def run_experiment():
     N_CTRL_RCT = 30
     N_EXT_POOL = 1000
 
-    DIM = 5
+    DIM = 3
 
     RCT_BIAS = 0.
     EXT_BIAS = 1.
@@ -132,7 +133,13 @@ def run_experiment():
             data_n = method_data[n_samp]
             
             errors = data_n['err']
-            energies = data_n['en']
+            # Filter None energies
+            energies_raw = data_n['en']
+            energies_valid = [e for e in energies_raw if e is not None]
+            
+            d12_valid = [d for d in data_n['d12'] if d is not None]
+            d11_valid = [d for d in data_n['d11'] if d is not None]
+            d22_valid = [d for d in data_n['d22'] if d is not None]
             
             # Store raw Errors for boxplot
             raw_errors_dict[method_name][n_samp] = errors
@@ -140,11 +147,19 @@ def run_experiment():
             # Compute Stats based on ERRORS
             bias = np.mean(errors)
             var = np.var(errors)
-            mean_en = np.mean(energies)
-            std_en = np.std(energies)
-            mean_d12 = np.mean(data_n['d12'])
-            mean_d11 = np.mean(data_n['d11'])
-            mean_d22 = np.mean(data_n['d22'])
+            
+            if energies_valid:
+                mean_en = np.mean(energies_valid)
+                std_en = np.std(energies_valid)
+                mean_d12 = np.mean(d12_valid)
+                mean_d11 = np.mean(d11_valid)
+                mean_d22 = np.mean(d22_valid)
+            else:
+                mean_en = np.nan
+                std_en = np.nan
+                mean_d12 = np.nan
+                mean_d11 = np.nan
+                mean_d22 = np.nan
             
             results_dict[method_name].append({
                 'n_sample': n_samp,
@@ -190,15 +205,18 @@ def run_experiment():
         X_dict_final = {
             "RCT Treatment": X_t,
             "RCT Control": X_i,
-            "External": X_e,
-            f"Matched ({method_name})": X_w
+            "External": X_e
         }
         Y_dict_final = {
             "RCT Treatment": Y_t,
             "RCT Control": Y_i,
-            "External": Y_e,
-            f"Matched ({method_name})": Y_w
+            "External": Y_e
         }
+        
+        # Only add Matched Sample if it exists (i.e. not IPW or weighting method that returns None)
+        if X_w is not None and Y_w is not None:
+            X_dict_final[f"Matched ({method_name})"] = X_w
+            Y_dict_final[f"Matched ({method_name})"] = Y_w
         
         # Save in method specific folder
         plot_covariate_densities(X_dict_final, DIM, output_dir=f"plots/{method_name}")

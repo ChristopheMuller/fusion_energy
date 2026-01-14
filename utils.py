@@ -3,6 +3,9 @@ from scipy.spatial.distance import cdist
 
 def compute_energy_distance_numpy(X1, X2):
     # Standard unweighted Energy Distance
+    if X1 is None:
+        return None, None, None, None
+
     n1 = X1.shape[0]
     n2 = X2.shape[0]
     
