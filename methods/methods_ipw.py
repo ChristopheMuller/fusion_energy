@@ -40,8 +40,10 @@ class IPWAugmenter:
                 cv=cv, 
                 solver='lbfgs', 
                 max_iter=max_iter,
-                class_weight='balanced', # Handles imbalance between Target vs Control sizes
-                scoring='neg_log_loss'   # Minimize log loss for better probability calibration
+                l1_ratios=(0,),
+                class_weight='balanced',
+                scoring='neg_log_loss',
+                use_legacy_attributes=False
             )
         )
 
