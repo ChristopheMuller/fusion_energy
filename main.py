@@ -2,7 +2,7 @@ import numpy as np
 from joblib import Parallel, delayed
 from collections import defaultdict
 from data_gen import create_complex_dataset
-from methods import EnergyAugmenter_Weighted, EnergyAugmenter_PooledTarget, EnergyAugmenter_Regularized, IPWAugmenter
+from methods import EnergyAugmenter_Weighted, EnergyAugmenter_PooledTarget, EnergyAugmenter_Regularized, IPWAugmenter, EnergyWeighting
 from utils import compute_energy_distance_numpy
 from visualization import (
     plot_bias_variance_comparison,
@@ -18,7 +18,8 @@ from visualization import (
 METHODS_CONFIG = {
     "Weighted_001k": (EnergyAugmenter_Weighted, {'k_best': 1}),
     "Weighted_100k": (EnergyAugmenter_Weighted, { 'k_best': 100}),
-    "IPW": (IPWAugmenter, {})
+    "IPW": (IPWAugmenter, {}),
+    "Weights": (EnergyWeighting, {})
 }
 
 def generate_tau():
@@ -82,7 +83,7 @@ def run_experiment():
     N_CTRL_RCT = 30
     N_EXT_POOL = 1000
 
-    DIM = 3
+    DIM = 1
 
     RCT_BIAS = 0.
     EXT_BIAS = 1.
