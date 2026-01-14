@@ -216,47 +216,6 @@ def plot_energy_comparison(results_dict, output_dir="plots"):
     
     print(f"Energy comparison plot saved to {output_dir}/")
 
-def plot_mse_decomposition_comparison(results_dict, output_dir="plots"):
-    """
-    Plots MSE decomposition (MSE, Bias^2, Variance) for all methods side-by-side.
-    """
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-        
-    n_methods = len(results_dict)
-    fig, axes = plt.subplots(1, n_methods, figsize=(6 * n_methods, 6), sharey=True)
-    
-    if n_methods == 1:
-        axes = [axes]
-        
-    styles = {
-        'MSE': {'color': 'purple', 'marker': 'o', 'linestyle': '-', 'linewidth': 2},
-        'Bias^2': {'color': 'red', 'marker': 'x', 'linestyle': '--', 'linewidth': 1.5},
-        'Variance': {'color': 'green', 'marker': 's', 'linestyle': '--', 'linewidth': 1.5}
-    }
-    
-    for ax, (method_name, results_list) in zip(axes, results_dict.items()):
-        n_samples = [r['n_sample'] for r in results_list]
-        bias_sq = [r['bias']**2 for r in results_list]
-        var = [r['variance'] for r in results_list]
-        mse = [b + v for b, v in zip(bias_sq, var)]
-        
-        ax.plot(n_samples, mse, label='MSE', **styles['MSE'])
-        ax.plot(n_samples, bias_sq, label='Bias²', **styles['Bias^2'])
-        ax.plot(n_samples, var, label='Variance', **styles['Variance'])
-        ax.set_title(f"{method_name}: MSE Decomposition")
-        ax.set_xlabel("N_SAMPLED")
-        ax.grid(True, alpha=0.3)
-        ax.legend()
-        
-    axes[0].set_ylabel("Error Squared")
-    
-    plt.tight_layout()
-    plt.savefig(f"{output_dir}/mse_decomposition_comparison.png")
-    plt.close()
-    
-    print(f"MSE decomposition plot saved to {output_dir}/")
-
 def plot_error_boxplot(raw_errors_dict, output_dir="plots"):
     """
     Plots boxplots of the Estimation Error (Est - True) distribution as n increases for all methods.
@@ -292,10 +251,6 @@ def plot_error_boxplot(raw_errors_dict, output_dir="plots"):
     print(f"Error boxplot comparison saved to {output_dir}/")
 
 def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
-    """
-    Plots MSE, Bias^2, Variance (left axis) and Energy (right axis) for each method individually.
-    Saves as energy_MSE_***.png
-    """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         
@@ -308,7 +263,6 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
         
         fig, ax1 = plt.subplots(figsize=(10, 6))
         
-        # Left Axis: Errors
         ax1.set_xlabel("N_SAMPLED")
         ax1.set_ylabel("Error Squared (MSE components)", color='black')
         
@@ -318,13 +272,11 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
         
         ax1.tick_params(axis='y', labelcolor='black')
         
-        # Right Axis: Energy
         ax2 = ax1.twinx()
         ax2.set_ylabel("Energy Distance", color='blue')
         l4 = ax2.plot(n_samples, energy, label='Energy', color='blue', marker='d', linestyle='-.', linewidth=1.5)
         ax2.tick_params(axis='y', labelcolor='blue')
         
-        # Combined Legend
         lines = l1 + l2 + l3 + l4
         labels = [l.get_label() for l in lines]
         ax1.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=4)
@@ -333,10 +285,69 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
         ax1.grid(True, alpha=0.3)
         plt.tight_layout()
         
-        # Sanitize filename
         safe_name = method_name.replace(' ', '_').replace('-', '_')
         filename = f"energy_MSE_{safe_name}.png"
         plt.savefig(os.path.join(output_dir, filename))
         plt.close()
         
     print(f"Individual Energy & MSE plots saved to {output_dir}/energy_MSE_*.png")
+
+    n_methods = len(results_dict)
+    if n_methods > 0:
+        fig, axes = plt.subplots(1, n_methods, figsize=(6 * n_methods, 6), sharey=True)
+        if n_methods == 1:
+            axes = [axes]
+            
+        methods_sorted = sorted(results_dict.keys())
+        
+        all_energies = []
+        for m in methods_sorted:
+            engs = [r['mean_energy'] for r in results_dict[m] if r['mean_energy'] is not None and not np.isnan(r['mean_energy'])]
+            all_energies.extend(engs)
+            
+        if all_energies:
+            min_en, max_en = min(all_energies), max(all_energies)
+            pad = (max_en - min_en) * 0.1 if max_en != min_en else 1.0
+            ylim_en = (min_en - pad, max_en + pad)
+        else:
+            ylim_en = (0, 1)
+
+        for i, (ax1, method_name) in enumerate(zip(axes, methods_sorted)):
+            results_list = results_dict[method_name]
+            n_samples = [r['n_sample'] for r in results_list]
+            bias_sq = [r['bias']**2 for r in results_list]
+            var = [r['variance'] for r in results_list]
+            mse = [b + v for b, v in zip(bias_sq, var)]
+            energy = [r['mean_energy'] for r in results_list]
+            
+            ax1.set_xlabel("N_SAMPLED")
+            if i == 0:
+                ax1.set_ylabel("Error Squared (MSE components)", color='black')
+            
+            l1 = ax1.plot(n_samples, mse, label='MSE', color='purple', marker='o', linestyle='-', linewidth=2)
+            l2 = ax1.plot(n_samples, bias_sq, label='Bias²', color='red', marker='x', linestyle='--', linewidth=0.3)
+            l3 = ax1.plot(n_samples, var, label='Variance', color='green', marker='s', linestyle='--', linewidth=0.3)
+            
+            ax1.tick_params(axis='y', labelcolor='black')
+            ax1.grid(True, alpha=0.3)
+            ax1.set_title(method_name)
+            
+            ax2 = ax1.twinx()
+            l4 = ax2.plot(n_samples, energy, label='Energy', color='blue', marker='d', linestyle='-.', linewidth=1.5)
+            
+            ax2.set_ylim(ylim_en)
+            ax2.tick_params(axis='y', labelcolor='blue')
+            
+            if i < n_methods - 1:
+                ax2.set_yticklabels([])
+            else:
+                ax2.set_ylabel("Energy Distance", color='blue')
+
+        lines = l1 + l2 + l3 + l4
+        labels = [l.get_label() for l in lines]
+        fig.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=4)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, "energy_MSE_combined.png"), bbox_inches='tight')
+        plt.close()
+        print(f"Combined Energy & MSE plot saved to {output_dir}/energy_MSE_combined.png")
