@@ -7,7 +7,6 @@ from utils import compute_energy_distance_numpy
 from visualization import (
     plot_bias_variance_comparison,
     plot_energy_comparison,
-    plot_mse_decomposition_comparison,
     plot_covariate_densities,
     plot_outcome_densities,
     plot_covariate_2d_scatter,
@@ -15,6 +14,12 @@ from visualization import (
     plot_energy_mse_method_decomposition
 )
 
+# --- Global Configuration ---
+METHODS_CONFIG = {
+    "Weighted": (EnergyAugmenter_Weighted, {'k_best': 1}),
+    "Weighted_10k": (EnergyAugmenter_Weighted, {'k_best': 10}),
+    "Weighted_100k": (EnergyAugmenter_Weighted, { 'k_best': 100})
+}
 
 def generate_tau():
     return 2.5
@@ -40,17 +45,11 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
     
     rep_results = []
     
-    # Define methods to run
-    methods_config = {
-        "Weighted": (EnergyAugmenter_Weighted, {}),
-        "PooledTarget": (EnergyAugmenter_PooledTarget, {}),
-        "Regularized": (EnergyAugmenter_Regularized, {'lambda_mean': 1.0})
-    }
-
     for n_samp in n_sampled_list:
-        for method_name, (MethodClass, kwargs) in methods_config.items():
+        for method_name, (MethodClass, kwargs) in METHODS_CONFIG.items():
             # 2. Fit and Sample Method for each n_sampled
-            augmenter = MethodClass(n_sampled=n_samp, k_best=1, lr=0.01, n_iter=200, **kwargs) 
+            # Note: We pass n_sampled here. Ideally k_best is also passed if it's in kwargs.
+            augmenter = MethodClass(n_sampled=n_samp, lr=0.01, n_iter=200, **kwargs) 
             augmenter.fit(X_t, X_i, X_e)
             
             X_w, Y_w = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
@@ -77,7 +76,7 @@ def run_experiment():
     N_CTRL_RCT = 30
     N_EXT_POOL = 1000
 
-    DIM = 6
+    DIM = 2
 
     RCT_BIAS = 0.
     EXT_BIAS = 0.7
@@ -160,7 +159,6 @@ def run_experiment():
     
     plot_bias_variance_comparison(results_dict)
     plot_energy_comparison(results_dict)
-    plot_mse_decomposition_comparison(results_dict)
     plot_energy_mse_method_decomposition(results_dict)
     plot_error_boxplot(raw_errors_dict)
     
@@ -178,15 +176,9 @@ def run_experiment():
     
     last_n = N_SAMPLED_LIST[-1]
     
-    methods_config = {
-        "Weighted": (EnergyAugmenter_Weighted, {}),
-        "PooledTarget": (EnergyAugmenter_PooledTarget, {}),
-        "Regularized": (EnergyAugmenter_Regularized, {'lambda_mean': 1.0})
-    }
-
-    for method_name, (MethodClass, kwargs) in methods_config.items():
+    for method_name, (MethodClass, kwargs) in METHODS_CONFIG.items():
         print(f"Plotting densities for {method_name}...")
-        augmenter = MethodClass(n_sampled=last_n, k_best=1, lr=0.01, n_iter=200, **kwargs) 
+        augmenter = MethodClass(n_sampled=last_n, lr=0.01, n_iter=200, **kwargs) 
         augmenter.fit(X_t, X_i, X_e)
         X_w, Y_w = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
         
