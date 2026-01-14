@@ -16,8 +16,8 @@ from visualization import (
 
 # --- Global Configuration ---
 METHODS_CONFIG = {
-    "Weighted": (EnergyAugmenter_Weighted, {'k_best': 1}),
-    "Weighted_10k": (EnergyAugmenter_Weighted, {'k_best': 10}),
+    "Weighted_001k": (EnergyAugmenter_Weighted, {'k_best': 1}),
+    "Weighted_010k": (EnergyAugmenter_Weighted, {'k_best': 10}),
     "Weighted_100k": (EnergyAugmenter_Weighted, { 'k_best': 100})
 }
 
@@ -52,9 +52,14 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
             augmenter = MethodClass(n_sampled=n_samp, lr=0.01, n_iter=200, **kwargs) 
             augmenter.fit(X_t, X_i, X_e)
             
-            X_w, Y_w = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
+            # Updated to unpack weights
+            X_w, Y_w, weights = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
             
-            att_w = np.mean(Y_t) - np.mean(Y_w)
+            # Compute ATT using weighted sum estimator
+            Y_control_full = np.concatenate([Y_i, Y_e])
+            mu_control_weighted = np.sum(weights * Y_control_full)
+            
+            att_w = np.mean(Y_t) - mu_control_weighted            
             en_w, d12, d11, d22 = compute_energy_distance_numpy(X_w, X_t)
             
             rep_results.append({
@@ -76,15 +81,15 @@ def run_experiment():
     N_CTRL_RCT = 30
     N_EXT_POOL = 1000
 
-    DIM = 2
+    DIM = 5
 
     RCT_BIAS = 0.
-    EXT_BIAS = 0.7
+    EXT_BIAS = 1.
     RCT_VAR = 1.0
     EXT_VAR = 2.0
 
     # Restoring full experiment settings
-    N_SAMPLED_LIST = [0, 5, 10, 15, 20, 30, 50, 75, 100, 150]
+    N_SAMPLED_LIST = [0, 5, 10, 15, 20, 30, 50, 75, 100]
     K_REP = 100
         
     print(f"Experimental Setup: N_SAMPLED={N_SAMPLED_LIST}")
@@ -180,7 +185,7 @@ def run_experiment():
         print(f"Plotting densities for {method_name}...")
         augmenter = MethodClass(n_sampled=last_n, lr=0.01, n_iter=200, **kwargs) 
         augmenter.fit(X_t, X_i, X_e)
-        X_w, Y_w = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
+        X_w, Y_w, _ = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
         
         X_dict_final = {
             "RCT Treatment": X_t,

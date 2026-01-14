@@ -115,9 +115,22 @@ class EnergyAugmenter_Weighted:
         X_aug_ext = X_external[best_ext_indices]
         X_fused = np.vstack([X_internal, X_aug_ext])
         
+        # Calculate Weights
+        n_i = X_internal.shape[0]
+        n_e = X_external.shape[0]
+        n_s = self.n_sampled
+        
+        # Weights vector corresponding to [Y_internal, Y_external]
+        weights = np.zeros(n_i + n_e)
+        
+        if n_i + n_s > 0:
+            w_val = 1.0 / (n_i + n_s)
+            weights[:n_i] = w_val
+            weights[n_i + best_ext_indices] = w_val
+
         if Y_internal is not None and Y_external is not None:
             Y_aug_ext = Y_external[best_ext_indices]
             Y_fused = np.concatenate([Y_internal, Y_aug_ext])
-            return X_fused, Y_fused
+            return X_fused, Y_fused, weights
             
-        return X_fused
+        return X_fused, weights
