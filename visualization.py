@@ -294,11 +294,25 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
 
     n_methods = len(results_dict)
     if n_methods > 0:
-        fig, axes = plt.subplots(1, n_methods, figsize=(6 * n_methods, 6), sharey=True)
+        methods_sorted = sorted(results_dict.keys())
+
+        width_ratios = []
+        for m in methods_sorted:
+            res = results_dict[m]
+            bsq = np.array([r['bias']**2 for r in res])
+            var = np.array([r['variance'] for r in res])
+            mse_chk = bsq + var
+            
+            # If constant (std ~ 0), it is a weighting method (independent of n_sampled)
+            if len(mse_chk) > 1 and np.std(mse_chk) < 1e-8:
+                width_ratios.append(2.5)
+            else:
+                width_ratios.append(5.5)
+        total_width = sum(width_ratios)
+        fig, axes = plt.subplots(1, n_methods, figsize=(total_width, 5), sharey=True,
+                                 gridspec_kw={'width_ratios': width_ratios})
         if n_methods == 1:
             axes = [axes]
-            
-        methods_sorted = sorted(results_dict.keys())
         
         all_energies = []
         for m in methods_sorted:
@@ -320,7 +334,7 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
             mse = [b + v for b, v in zip(bias_sq, var)]
             energy = [r['mean_energy'] for r in results_list]
             
-            ax1.set_xlabel("N_SAMPLED")
+            ax1.set_xlabel("Samples")
             if i == 0:
                 ax1.set_ylabel("Error Squared (MSE components)", color='black')
             
