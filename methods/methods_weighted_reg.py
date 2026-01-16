@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-class EnergyAugmenter_Regularized:
+class EnergyAugmenter_MatchingReg:
     def __init__(self, n_sampled=100, k_best=100, lr=0.01, n_iter=500, lambda_mean=10.0):
         self.n_sampled = n_sampled
         self.k_best = k_best

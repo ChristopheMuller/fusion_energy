@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-class EnergyWeighting:
+class EnergyAugmenter_Weighting:
     """
     Learns weights for a combined pool (Internal + External) to minimize 
     Energy Distance to the Target distribution.
