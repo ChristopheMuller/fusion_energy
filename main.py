@@ -5,13 +5,14 @@ from collections import defaultdict
 import os
 
 from data_gen import create_complex_dataset
-from method_whole import NaivePooled, NaiveRCT, WholeIPW
+from method_whole import NaivePooled, NaiveRCT, WholeIPW, EnergyRouter
 
 # --- Configuration ---
 METHODS = {
     "Naive Pooled": NaivePooled,
     "Naive RCT": NaiveRCT,
-    "Whole IPW": WholeIPW
+    "Whole IPW": WholeIPW,
+    "Energy Router": EnergyRouter
 }
 
 def generate_tau():
@@ -77,8 +78,8 @@ def plot_results(results_map, output_dir="plots"):
         rmse = np.sqrt(mse)
         
         print(f"{name:<15} | {bias:<10.4f} | {var:<10.4f} | {mse:<10.4f} | {rmse:<10.4f}")
-        
-        labels.append(name)
+        names_label = name + f" (n={np.mean(results_map[name]['n_obs']):.1f})"
+        labels.append(names_label)
         data.append(errors)
         
     # Boxplot
@@ -96,10 +97,12 @@ def plot_results(results_map, output_dir="plots"):
 
 def run_experiment():
     N_TREAT = 150
-    N_CTRL_RCT = 150
+    N_CTRL_RCT = 50
     N_EXT_POOL = 1000
-    DIM = 5
-    RCT_BIAS = 0.5
+
+    DIM = 3
+    
+    RCT_BIAS = 0.
     EXT_BIAS = 1.0
     RCT_VAR = 1.0
     EXT_VAR = 2.0
