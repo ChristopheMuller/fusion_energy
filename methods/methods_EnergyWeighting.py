@@ -11,16 +11,19 @@ class EnergyAugmenter_Weighting:
     - Treats Internal and External units equally (concatenated).
     - Returns weights for the full combined dataset.
     """
-    def __init__(self, lr=0.01, n_iter=500, device=None, **kwargs):
+    def __init__(self, n_sampled=None, lr=0.01, n_iter=500, device=None, **kwargs):
+        # n_sampled is unused for weighting logic but kept for interface compatibility
+        self.n_sampled = n_sampled
         self.lr = lr
         self.n_iter = n_iter
         self.weights_ = None
         self.device = device if device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-    def fit(self, X_target, X_internal, X_external):
+    def fit(self, X_target, X_control, X_external):
         # 1. Prepare Data
         # Combine Internal and External into a single Control pool
-        X_control_np = np.vstack([X_internal, X_external])
+        # For the experiment setup, X_control might be empty, so we weight X_external
+        X_control_np = np.vstack([X_control, X_external])
         
         # Move to tensor
         X_t = torch.tensor(X_target, dtype=torch.float32, device=self.device)
@@ -29,10 +32,13 @@ class EnergyAugmenter_Weighting:
         n_c = X_c.shape[0] # Number of control units
         n_t = X_t.shape[0] # Number of target units
         
+        if n_c == 0:
+            self.weights_ = np.array([])
+            return self
+        
         # 2. Pre-compute Distance Matrices
         # We need to minimize Energy Distance: 2*E[|X-Y|] - E[|X-X'|] - E[|Y-Y'|]
         # X is Weighted Control, Y is Uniform Target.
-        # The term E[|Y-Y'|] (Target-Target) is constant w.r.t weights, so we ignore it.
         
         # Term A: Control vs Target (Interaction)
         # Shape: (n_c, n_t) -> sum over dim 1 -> (n_c,)
@@ -77,7 +83,13 @@ class EnergyAugmenter_Weighting:
         if self.weights_ is None:
             raise ValueError("Must call fit() before sample()")
         
-        if Y_internal is not None and Y_external is not None:
-            return None, None, self.weights_
+        # Reconstruct the pool used in fit
+        X_pool = np.vstack([X_internal, X_external])
         
-        return None, self.weights_
+        # Return the pool and its weights
+        # If Ys are provided, stack them too
+        if Y_internal is not None and Y_external is not None:
+            Y_pool = np.concatenate([Y_internal, Y_external])
+            return X_pool, Y_pool, self.weights_
+        
+        return X_pool, self.weights_
