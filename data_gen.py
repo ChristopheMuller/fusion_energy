@@ -44,13 +44,16 @@ def create_complex_dataset(n_treat, n_control_rct, n_external, dim, tau, rct_bia
 
     # Outcomes
     beta = np.ones(dim)
-    _, Y_target = generate_outcomes_nonlinear(X_target, tau, beta=beta)
+    Y0_target, Y_target = generate_outcomes_nonlinear(X_target, tau, beta=beta)
     Y0_control, _ = generate_outcomes_nonlinear(X_control, tau, beta=beta)
     Y0_ext, _ = generate_outcomes_nonlinear(X_ext, tau, beta=beta)
+
+    true_att = np.mean(Y_target - Y0_target)
 
     return {
         "target": {"X": X_target, "Y": Y_target},
         "internal": {"X": X_control, "Y": Y0_control},
         "external": {"X": X_ext, "Y": Y0_ext},
-        "tau": tau
+        "tau": tau,
+        "true_att": true_att
     }

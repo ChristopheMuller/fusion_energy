@@ -21,53 +21,59 @@ METHODS_CONFIG = {
     "En.Weighting": (EnergyAugmenter_Weighting, {})
 }
 
-def generate_tau():
-    return 2.5
+def process_repetition(rep_id, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var, tau):
+    data = create_complex_dataset(n_treat, n_ctrl, n_ext, dim, tau, rct_bias=rct_bias, ext_bias=ext_bias, rct_var=rct_var, ext_var=ext_var)
 
-def process_repetition(rep_id, n_sampled_list, n_rct, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var):
-    """
-    Runs a single simulation repetition under the new Experimental Setup.
-    1. Generate RCT population (X_rct) and External population (X_ext).
-    2. Loop through n_sampled_list.
-       a. Find matching set from X_ext to X_rct (size n_samp).
-       b. Determine split sizes: n_treated = (n_rct + n_samp)/2.
-       c. Randomly split X_rct into Treatment and Control.
-       d. Combine RCT Control + Matched External.
-       e. Compute ATE and stats.
-    """
+    X_t = data["target"]["X"]
+    Y_t = data["target"]["Y"]
+    X_i = data["internal"]["X"]
+    Y_i = data["internal"]["Y"]
+    X_e = data["external"]["X"]
+    Y_e = data["external"]["Y"]
     
-    # 1. Generate Data
-    tau = generate_tau()
+    true_att = data['true_att']
+
+    res = {}
     
-    # RCT Population (Single population, centered at 1.0)
-    mean_rct = np.ones(dim)
-    X_rct = generate_covariates(n_rct, dim, mean_rct, var=rct_var)
-    
-    # External Population (Centered at 1.0 - ext_bias)
-    mean_ext = mean_rct - ext_bias
-    X_ext = generate_covariates(n_ext, dim, mean_ext, var=ext_var)
-    
-    # Outcomes
-    # We need potential outcomes for RCT to allow post-hoc splitting
-    beta = np.ones(dim)
-    Y0_rct, Y1_rct = generate_outcomes_nonlinear(X_rct, tau, beta=beta)
-    
-    # For External, assume Control outcomes (Y0)
-    Y0_ext, _ = generate_outcomes_nonlinear(X_ext, tau, beta=beta)
-    
-    rep_results = []
-    
-    for n_samp in n_sampled_list:
+    for name, MethodClass in METHODS.items():
+        method = MethodClass()
+        try:
+            att, n_obs = method.estimate(X_t, Y_t, X_i, Y_i, X_e, Y_e)
+            res[name] = {
+                'att': att,
+                'error': att - true_att,
+                'n_obs': n_obs
+            }
+        except Exception as e:
+            print(f"Error in {name}: {e}")
+            res[name] = {
+                'att': np.nan,
+                'error': np.nan,
+                'n_obs': np.nan
+            }
+            
+    return res
+
+def plot_results(results_map, output_dir="plots"):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
         
-        # Calculate split sizes
-        # n_treated = (n_rct + n_samp) / 2
-        # We ensure integer sizes
-        n_treated = int((n_rct + n_samp) / 2)
-        n_control_rct = n_rct - n_treated
+    # Prepare data for boxplot
+    labels = []
+    data = []
+    
+    sorted_names = sorted(results_map.keys())
+    
+    print("\n--- Summary Statistics ---")
+    print(f"{'Method':<15} | {'Bias':<10} | {'Variance':<10} | {'MSE':<10} | {'RMSE':<10}")
+    print("-" * 65)
+    
+    for name in sorted_names:
+        errors = results_map[name]['errors']
+        # Remove NaNs
+        errors = [e for e in errors if not np.isnan(e)]
         
-        # Check validity
-        if n_control_rct < 0:
-            # Cannot satisfy required treatment size from RCT
+        if not errors:
             continue
 
         # Shuffle RCT for random assignment
@@ -197,22 +203,16 @@ def run_experiment():
     
     # RCT Bias is N/A since it's one population, but we define variance
     RCT_VAR = 1.0
+    EXT_VAR = 2.0
     
-    # External Bias relative to RCT
-    EXT_BIAS = 1.0
-    EXT_VAR = 1.5
+    TAU = 2.5
 
-    # Sample sizes (External samples to add)
-    N_SAMPLED_LIST = [0, 1, 2, 3, 4, 5, 10, 20, 30, 50, 75, 100, 150]
-    K_REP = 300
-        
-    print(f"Experimental Setup: N_SAMPLED={N_SAMPLED_LIST}")
-    print(f"Repetitions: {K_REP}")
-    print(f"Running in PARALLEL (Joblib)...")
-
-    # Run K_REP independent simulations in parallel
-    all_reps_results = Parallel(n_jobs=-1, verbose=5)(
-        delayed(process_repetition)(k, N_SAMPLED_LIST, N_RCT, N_EXT_POOL, DIM, 0.0, EXT_BIAS, RCT_VAR, EXT_VAR)
+    K_REP = 100
+    
+    print(f"Running {K_REP} repetitions...")
+    
+    results_list = Parallel(n_jobs=-1, verbose=1)(
+        delayed(process_repetition)(k, N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, RCT_BIAS, EXT_BIAS, RCT_VAR, EXT_VAR, TAU)
         for k in range(K_REP)
     )
     
