@@ -16,9 +16,8 @@ from visualization import (
 
 # --- Global Configuration ---
 METHODS_CONFIG = {
-    "En.Matching (Top 1)": (EnergyAugmenter_Matching, {'k_best': 1}),
-    "En.Matching (Top 100)": (EnergyAugmenter_Matching, { 'k_best': 100}),
-    # "En.PooledTarget_100k": (EnergyAugmenter_PooledTarget, {'k_best': 100}),
+    "En.PooledTarget_100k": (EnergyAugmenter_PooledTarget, {'k_best': 100}),
+    "En.Matching_100k": (EnergyAugmenter_Matching, {'k_best': 100}),
     "IPW": (IPWAugmenter, {}),
     "En.Weighting": (EnergyAugmenter_Weighting, {})
 }
@@ -79,16 +78,16 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
 
 def run_experiment():
 
-    N_TREAT = 150
-    N_CTRL_RCT = 150
+    N_TREAT = 100
+    N_CTRL_RCT = 100
     N_EXT_POOL = 1000
 
-    DIM = 5
-
-    RCT_BIAS = 0.5
+    DIM = 2
+    
+    RCT_BIAS = 0.
     EXT_BIAS = 1.
     RCT_VAR = 1.0
-    EXT_VAR = 2.0
+    EXT_VAR = 1.5
 
     # Restoring full experiment settings
     N_SAMPLED_LIST = [0, 5, 10, 20, 30, 50, 75, 100, 150]

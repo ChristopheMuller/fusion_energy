@@ -10,21 +10,21 @@ class EnergyAugmenter_PooledTarget:
         self.n_iter = n_iter
         self.weights_ = None
         
-    def fit(self, X_target, X_internal, X_external):
+    def fit(self, X_target, X_control, X_external):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         X_t = torch.tensor(X_target, dtype=torch.float32, device=device)
-        X_i = torch.tensor(X_internal, dtype=torch.float32, device=device)
+        X_c = torch.tensor(X_control, dtype=torch.float32, device=device)
         X_e = torch.tensor(X_external, dtype=torch.float32, device=device)
         
-        X_pool = torch.cat([X_t, X_i], dim=0)
+        X_pool = torch.cat([X_t, X_c], dim=0)
         
         n_e = X_e.shape[0]
         
-        d_ep = torch.cdist(X_e, X_pool)
-        d_ep_mean = d_ep.mean(dim=1) 
+        d_ep = torch.cdist(X_e, X_pool) # distance matrix shape (n_e, n_pool)
+        d_ep_mean = d_ep.mean(dim=1) # mean distance to pool for each external sample (n_e,)
         
-        d_ee = torch.cdist(X_e, X_e)
+        d_ee = torch.cdist(X_e, X_e) # distance matrix among external samples (n_e, n_e)
 
         logits = torch.zeros(n_e, requires_grad=True, device=device)
         opt = torch.optim.Adam([logits], lr=self.lr)

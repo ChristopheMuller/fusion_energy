@@ -100,9 +100,9 @@ def run_experiment():
     N_CTRL_RCT = 50
     N_EXT_POOL = 1000
 
-    DIM = 3
+    DIM = 1
     
-    RCT_BIAS = 0.
+    RCT_BIAS = 0.2
     EXT_BIAS = 1.0
     RCT_VAR = 1.0
     EXT_VAR = 2.0

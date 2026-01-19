@@ -10,9 +10,23 @@ def generate_outcomes_nonlinear(X, treatment_effect, beta=None):
     
     if beta is None:
         beta = np.random.uniform(-2, 2, size=d)
-
     y0 = X @ beta + np.random.normal(0, 0.5, n)
     y1 = y0 + treatment_effect
+
+    # y0 = np.zeros(n)
+    # if d >= 1:
+    #     y0 += np.sin(X[:, 0])
+    # if d >= 2:
+    #     y0 += np.log(np.abs(X[:, 1]) + 1)
+    # if d >= 3:
+    #     y0 += X[:, 2] ** 2
+    # if d >= 4:
+    #     y0 += np.exp(-X[:, 3] ** 2 / 2)
+    # if d >= 6:
+    #     y0 += np.ones(d-4) @ X[:, 4:d].T
+
+    # y1 = y0 + treatment_effect
+
     return y0, y1
 
 def create_complex_dataset(n_treat, n_control_rct, n_external, dim, tau, rct_bias=0., ext_bias=1., rct_var=1.0, ext_var=2.0):
