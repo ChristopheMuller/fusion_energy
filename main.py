@@ -15,11 +15,7 @@ METHODS = {
     "Energy Router": EnergyRouter
 }
 
-def generate_tau():
-    return 2.5
-
-def process_repetition(rep_id, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var):
-    tau = generate_tau()
+def process_repetition(rep_id, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var, tau):
     data = create_complex_dataset(n_treat, n_ctrl, n_ext, dim, tau, rct_bias=rct_bias, ext_bias=ext_bias, rct_var=rct_var, ext_var=ext_var)
 
     X_t = data["target"]["X"]
@@ -29,6 +25,8 @@ def process_repetition(rep_id, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, 
     X_e = data["external"]["X"]
     Y_e = data["external"]["Y"]
     
+    true_att = data['true_att']
+
     res = {}
     
     for name, MethodClass in METHODS.items():
@@ -37,7 +35,7 @@ def process_repetition(rep_id, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, 
             att, n_obs = method.estimate(X_t, Y_t, X_i, Y_i, X_e, Y_e)
             res[name] = {
                 'att': att,
-                'error': att - tau,
+                'error': att - true_att,
                 'n_obs': n_obs
             }
         except Exception as e:
@@ -107,12 +105,14 @@ def run_experiment():
     RCT_VAR = 1.0
     EXT_VAR = 2.0
     
+    TAU = 2.5
+
     K_REP = 100
     
     print(f"Running {K_REP} repetitions...")
     
     results_list = Parallel(n_jobs=-1, verbose=1)(
-        delayed(process_repetition)(k, N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, RCT_BIAS, EXT_BIAS, RCT_VAR, EXT_VAR)
+        delayed(process_repetition)(k, N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, RCT_BIAS, EXT_BIAS, RCT_VAR, EXT_VAR, TAU)
         for k in range(K_REP)
     )
     

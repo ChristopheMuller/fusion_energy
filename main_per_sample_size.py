@@ -22,10 +22,7 @@ METHODS_CONFIG = {
     "En.Weighting": (EnergyAugmenter_Weighting, {})
 }
 
-def generate_tau():
-    return 2.5
-
-def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var):
+def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var, tau):
     """
     Runs a single simulation repetition:
     1. Generates a fresh dataset.
@@ -34,7 +31,6 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
     Returns a list of result dictionaries for each n_sampled.
     """
     # 1. Generate NEW Data
-    tau = generate_tau()
     data = create_complex_dataset(n_treat, n_ctrl, n_ext, dim, tau, rct_bias=rct_bias, ext_bias=ext_bias, rct_var=rct_var, ext_var=ext_var)
 
     X_t = data["target"]["X"]
@@ -43,6 +39,8 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
     Y_t = data["target"]["Y"]
     Y_i = data["internal"]["Y"]
     Y_e = data["external"]["Y"]
+    
+    true_att = data['true_att']
     
     rep_results = []
     
@@ -66,7 +64,7 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
             rep_results.append({
                 'method': method_name,
                 'n_sample': n_samp,
-                'true_tau': tau,
+                'true_tau': true_att,
                 'att': att_w,
                 'en': en_w,
                 'd12': d12,
@@ -89,6 +87,8 @@ def run_experiment():
     RCT_VAR = 1.0
     EXT_VAR = 1.5
 
+    TAU = 2.5
+
     # Restoring full experiment settings
     N_SAMPLED_LIST = [0, 5, 10, 20, 30, 50, 75, 100, 150]
     K_REP = 100
@@ -99,7 +99,7 @@ def run_experiment():
 
     # Run K_REP independent simulations in parallel
     all_reps_results = Parallel(n_jobs=-1, verbose=5)(
-        delayed(process_repetition)(k, N_SAMPLED_LIST, N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, RCT_BIAS, EXT_BIAS, RCT_VAR, EXT_VAR)
+        delayed(process_repetition)(k, N_SAMPLED_LIST, N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, RCT_BIAS, EXT_BIAS, RCT_VAR, EXT_VAR, TAU)
         for k in range(K_REP)
     )
     
@@ -113,8 +113,8 @@ def run_experiment():
         for res in rep_res:
             m = res['method']
             n = res['n_sample']
-            tau = res['true_tau']
-            agg_map[m][n]['err'].append(res['att'] - tau)
+            true_tau = res['true_tau']
+            agg_map[m][n]['err'].append(res['att'] - true_tau)
             agg_map[m][n]['en'].append(res['en'])
             agg_map[m][n]['d12'].append(res['d12'])
             agg_map[m][n]['d11'].append(res['d11'])
@@ -184,8 +184,7 @@ def run_experiment():
     
     # Generate detailed plots for ONE representative run (locally) but for ALL methods
     print("Generating detailed density plots for a single example run (all methods)...")
-    tau = generate_tau()
-    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, tau, rct_bias=RCT_BIAS, ext_bias=EXT_BIAS, rct_var=RCT_VAR, ext_var=EXT_VAR)
+    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, TAU, rct_bias=RCT_BIAS, ext_bias=EXT_BIAS, rct_var=RCT_VAR, ext_var=EXT_VAR)
     
     X_t = data["target"]["X"]
     Y_t = data["target"]["Y"]
