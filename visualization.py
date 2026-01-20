@@ -374,7 +374,8 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
             mse_chk = bsq + var
             
             # If constant (std ~ 0), it is a weighting method (independent of n_sampled)
-            if len(mse_chk) > 1 and np.std(mse_chk) < 1e-2:
+            # if len(mse_chk) > 1 and np.std(mse_chk) < 1e-2:
+            if False:
                 width_ratios.append(2.5)
             else:
                 width_ratios.append(5.5)
