@@ -27,29 +27,78 @@ METHODS_CONFIG = {
 def tau_fn(X):
     return np.ones(X.shape[0]) *  1.5
 
-def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var, tau):
+def process_repetition(rep_id, n_sampled_list, n_rct, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var, tau):
     """
     Runs a single simulation repetition:
-    1. Generates a fresh dataset.
-    2. Loops through all requested sample sizes to fit and sample.
-    
-    Returns a list of result dictionaries for each n_sampled.
+    1. Generates Pooled RCT (unbiased) and External data.
+    2. Loops through n_sampled_list:
+       (A) Pre-split: Measure energy between Pooled RCT and best matching External sample.
+       (B) Split RCT into Treated/Control to balance sizes.
+       (C) Run methods on the split data.
     """
     # 1. Generate NEW Data
-    data = create_complex_dataset(n_treat, n_ctrl, n_ext, dim, tau, rct_bias=rct_bias, ext_bias=ext_bias, rct_var=rct_var, ext_var=ext_var)
+    data = create_complex_dataset(n_rct, 0, n_ext, dim, tau, rct_bias=0.0, ext_bias=ext_bias, rct_var=rct_var, ext_var=ext_var)
 
-    X_t = data["target"]["X"]
-    X_i = data["internal"]["X"]
+    X_rct_pool = data["target"]["X"]
+    # Y_rct_pool = data["target"]["Y"] # This is Y1 for target, we need potential outcomes
+    Y0_rct_pool = data["target"]["Y0"]
+    Y1_rct_pool = data["target"]["Y1"]
+    
     X_e = data["external"]["X"]
-    Y_t = data["target"]["Y"]
-    Y_i = data["internal"]["Y"]
     Y_e = data["external"]["Y"]
     
     true_att = data['true_att']
     
-    rep_results = []
+    rep_results = []    
+    indices_rct = np.arange(n_rct)
     
     for n_samp in n_sampled_list:
+        
+        # --- (A) Measure Pooled Energy ---
+        # Minimum energy between a matching sample of size n_sampled and the pooled RCT data.
+        en_pooled = None
+        if n_samp > 0:
+            # We use EnergyAugmenter_Matching to find the best subset of External that matches X_rct_pool
+            # Target = X_rct_pool
+            # Internal = Empty
+            matcher_pool = EnergyAugmenter_Matching(n_sampled=n_samp, k_best=20, lr=0.01, n_iter=200)
+            X_empty = np.zeros((0, dim))
+            
+            matcher_pool.fit(X_rct_pool, X_empty, X_e)
+            # sample returns X_fused. Since Internal is empty, X_fused is just the matched external sample.
+            X_matched_pool, _ = matcher_pool.sample(X_rct_pool, X_empty, X_e)
+            
+            # Compute Energy(Matched, Pooled RCT)
+            en_pooled, _, _, _ = compute_energy_distance_numpy(X_matched_pool, X_rct_pool)
+        else:
+            en_pooled = 0.0 # No external sample, energy of empty? Or technically undefined. Let's set to 0 or nan.
+            # If n_sampled=0, we just have RCT. The "Matching Energy" is not applicable or is 0 distance if we consider we add nothing.
+            # But for plotting, let's keep it None or 0.
+        
+        # --- (B) Split Pooled RCT ---
+        # n_treated = (n_rct + n_sampled) / 2
+        n_t = int((n_rct + n_samp) / 2)
+        n_c = n_rct - n_t
+        
+        if n_c < 2: 
+            # If n_sampled is too large, n_c becomes too small. 
+            # n_t <= n_rct => (n_rct + n_samp)/2 <= n_rct => n_samp <= n_rct.
+            # We assume n_samp <= n_rct roughly.
+            continue
+
+        np.random.shuffle(indices_rct)
+        idx_t = indices_rct[:n_t]
+        idx_c = indices_rct[n_t:]
+        
+        X_t = X_rct_pool[idx_t]
+        # Y_t should be Y1 (Treated)
+        Y_t = Y1_rct_pool[idx_t]
+        
+        X_i = X_rct_pool[idx_c]
+        # Y_i should be Y0 (Control)
+        Y_i = Y0_rct_pool[idx_c]
+
+        # --- (C) Run Methods ---
         for method_name, (MethodClass, kwargs) in METHODS_CONFIG.items():
             # 2. Fit and Sample Method for each n_sampled
             augmenter = MethodClass(n_sampled=n_samp, lr=0.01, n_iter=200, **kwargs) 
@@ -76,15 +125,15 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
                 'en': en_w,
                 'd12': d12,
                 'd11': d11,
-                'd22': d22
+                'd22': d22,
+                'en_pooled': en_pooled
             })
         
     return rep_results
 
 def run_experiment():
 
-    N_TREAT = 100
-    N_CTRL_RCT = 100
+    N_RCT = 300
     N_EXT_POOL = 1000
 
     DIM = 3
@@ -97,23 +146,23 @@ def run_experiment():
     TAU = tau_fn
 
     # Restoring full experiment settings
-    N_SAMPLED_LIST = [0, 5, 10, 20, 30, 50, 75, 100, 150]
+    N_SAMPLED_LIST = [0, 5, 10, 20, 30, 50]
     K_REP = 150
         
-    print(f"Experimental Setup: N_SAMPLED={N_SAMPLED_LIST}")
+    print(f"Experimental Setup: N_RCT={N_RCT}, N_SAMPLED={N_SAMPLED_LIST}")
     print(f"Repetitions: {K_REP}")
     print(f"Running in PARALLEL (Joblib)...")
 
     # Run K_REP independent simulations in parallel
     all_reps_results = Parallel(n_jobs=-1, verbose=5)(
-        delayed(process_repetition)(k, N_SAMPLED_LIST, N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, RCT_BIAS, EXT_BIAS, RCT_VAR, EXT_VAR, TAU)
+        delayed(process_repetition)(k, N_SAMPLED_LIST, N_RCT, N_EXT_POOL, DIM, RCT_BIAS, EXT_BIAS, RCT_VAR, EXT_VAR, TAU)
         for k in range(K_REP)
     )
     
     # Aggregate results
     # Structure: agg_map[method][n_sample] = {'err': [], 'en': [], ...}
     agg_map = defaultdict(lambda: defaultdict(lambda: {
-        'err': [], 'en': [], 'd12': [], 'd11': [], 'd22': []
+        'err': [], 'en': [], 'd12': [], 'd11': [], 'd22': [], 'en_pooled': []
     }))
     
     for rep_res in all_reps_results:
@@ -126,6 +175,7 @@ def run_experiment():
             agg_map[m][n]['d12'].append(res['d12'])
             agg_map[m][n]['d11'].append(res['d11'])
             agg_map[m][n]['d22'].append(res['d22'])
+            agg_map[m][n]['en_pooled'].append(res['en_pooled'])
     
     # Containers for final stats
     results_dict = defaultdict(list)
@@ -147,6 +197,9 @@ def run_experiment():
             d12_valid = [d for d in data_n['d12'] if d is not None]
             d11_valid = [d for d in data_n['d11'] if d is not None]
             d22_valid = [d for d in data_n['d22'] if d is not None]
+
+            en_pooled_raw = data_n['en_pooled']
+            en_pooled_valid = [e for e in en_pooled_raw if e is not None]
             
             # Store raw Errors for boxplot
             raw_errors_dict[method_name][n_samp] = errors
@@ -168,6 +221,11 @@ def run_experiment():
                 mean_d11 = np.nan
                 mean_d22 = np.nan
             
+            if en_pooled_valid:
+                mean_en_pooled = np.mean(en_pooled_valid)
+            else:
+                mean_en_pooled = np.nan
+
             results_dict[method_name].append({
                 'n_sample': n_samp,
                 'bias': bias,
@@ -176,7 +234,8 @@ def run_experiment():
                 'std_energy': std_en,
                 'mean_d12': mean_d12,
                 'mean_d11': mean_d11,
-                'mean_d22': mean_d22
+                'mean_d22': mean_d22,
+                'mean_pooled_energy': mean_en_pooled
             })
             
             print(f"  N={n_samp}: Bias={bias:.3f} Var={var:.3f}")
@@ -200,24 +259,43 @@ def run_experiment():
         print(f"  {method_name}: N={best_entry['n_sample']} (MSE={mse:.4f})")
 
     # Generate detailed plots for ONE representative run (locally) but for ALL methods
+    # We need to manually replicate the split logic for this single run
     print("Generating detailed density plots for a single example run (all methods)...")
-    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, TAU, rct_bias=RCT_BIAS, ext_bias=EXT_BIAS, rct_var=RCT_VAR, ext_var=EXT_VAR)
     
-    X_t = data["target"]["X"]
-    
-    if callable(TAU):
-        print("Plotting treatment effect heterogeneity...")
-        tau_vals = TAU(X_t)
-        plot_treatment_effect_heterogeneity(X_t, tau_vals, output_dir="plots")
+    # Generate Pooled RCT
+    data = create_complex_dataset(N_RCT, 0, N_EXT_POOL, DIM, TAU, rct_bias=0.0, ext_bias=EXT_BIAS, rct_var=RCT_VAR, ext_var=EXT_VAR)
+    X_rct_pool = data["target"]["X"]
+    # Y_rct_pool = data["target"]["Y"]
+    Y0_rct_pool = data["target"]["Y0"]
+    Y1_rct_pool = data["target"]["Y1"]
 
-    Y_t = data["target"]["Y"]
-    X_i = data["internal"]["X"]
-    Y_i = data["internal"]["Y"]
     X_e = data["external"]["X"]
     Y_e = data["external"]["Y"]
+    
+    # Check heterogeneity
+    if callable(TAU):
+        print("Plotting treatment effect heterogeneity...")
+        tau_vals = TAU(X_rct_pool)
+        plot_treatment_effect_heterogeneity(X_rct_pool, tau_vals, output_dir="plots")
         
     for method_name, (MethodClass, kwargs) in METHODS_CONFIG.items():
         best_n = best_n_per_method.get(method_name, N_SAMPLED_LIST[-1])
+        
+        # Re-Split based on best_n
+        n_t = int((N_RCT + best_n) / 2)
+        indices_rct = np.arange(N_RCT)
+        np.random.shuffle(indices_rct)
+        idx_t = indices_rct[:n_t]
+        idx_c = indices_rct[n_t:]
+        
+        X_t = X_rct_pool[idx_t]
+        # Y_t = Y_rct_pool[idx_t]
+        Y_t = Y1_rct_pool[idx_t]
+
+        X_i = X_rct_pool[idx_c]
+        # Y_i = Y_rct_pool[idx_c]
+        Y_i = Y0_rct_pool[idx_c]
+
         print(f"Plotting densities for {method_name} (using Best N={best_n})...")
         augmenter = MethodClass(n_sampled=best_n, lr=0.01, n_iter=200, **kwargs) 
         augmenter.fit(X_t, X_i, X_e)
@@ -239,11 +317,8 @@ def run_experiment():
         if X_w is not None and Y_w is not None:
             X_matched = X_w
             Y_matched = Y_w
-            # remove RCT control from matched if present
-            X_matched = X_matched[~np.isin(X_matched, X_i).all(axis=1)]
-            Y_matched = Y_matched[~np.isin(X_w, X_i).all(axis=1)]
-            X_dict_final[f"Matched ({method_name})"] = X_matched
-            Y_dict_final[f"Matched ({method_name})"] = Y_w
+            X_dict_final[f"Fused Control ({method_name})"] = X_matched
+            Y_dict_final[f"Fused Control ({method_name})"] = Y_w
         
         # Save in method specific folder
         plot_covariate_densities(X_dict_final, DIM, output_dir=f"plots/{method_name}")

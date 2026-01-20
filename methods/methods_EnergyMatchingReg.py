@@ -40,7 +40,10 @@ class EnergyAugmenter_MatchingReg(BaseAugmenter):
         # Target Mean
         mu_t = X_t.mean(dim=0)
         # Internal Mean (Fixed)
-        mu_i = X_i.mean(dim=0)
+        if n_i > 0:
+            mu_i = X_i.mean(dim=0)
+        else:
+            mu_i = torch.zeros(X_t.shape[1], device=device)
         
         # Optimization
         logits = torch.zeros(n_e, requires_grad=True, device=device)
@@ -55,7 +58,11 @@ class EnergyAugmenter_MatchingReg(BaseAugmenter):
             term1 = 2 * beta * term1_ext
             
             term2_ee = torch.dot(w, torch.mv(d_ee, w))
-            term2_ie = torch.dot(w, d_ie_sum) / n_i
+            if n_i > 0:
+                term2_ie = torch.dot(w, d_ie_sum) / n_i
+            else:
+                term2_ie = torch.tensor(0.0, device=device)
+
             term2 = (beta**2 * term2_ee + 2 * alpha * beta * term2_ie)
             
             loss_energy = term1 - term2

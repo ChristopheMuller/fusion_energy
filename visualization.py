@@ -11,7 +11,7 @@ def plot_covariate_densities(data_dict, dim, output_dir="plots"):
         plt.figure(figsize=(10, 6))
         for label, X in data_dict.items():
             # Adjust style for Matched Sample if present to make it stand out
-            if "Matched" in label:
+            if "Matched" in label or "Fused" in label:
                 plt.hist(X[:, d], bins=30, density=True, alpha=0.3, label=label, 
                          histtype='step', linewidth=2, color='black', linestyle='--')
             else:
@@ -32,7 +32,7 @@ def plot_outcome_densities(outcome_dict, output_dir="plots"):
 
     plt.figure(figsize=(10, 6))
     for label, Y in outcome_dict.items():
-        if "Matched" in label:
+        if "Matched" in label or "Fused" in label:
             plt.hist(Y, bins=30, density=True, alpha=0.3, label=label, 
                      histtype='step', linewidth=2, color='black', linestyle='--')
         else:
@@ -68,15 +68,16 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
     pca = PCA(n_components=2)
     pca.fit(all_data)
     
-    base_keys = [k for k in data_dict.keys() if "Matched" not in k]
-    matched_keys = [k for k in data_dict.keys() if "Matched" in k]
+    base_keys = [k for k in data_dict.keys() if "Matched" not in k and "Fused" not in k]
+    matched_keys = [k for k in data_dict.keys() if "Matched" in k or "Fused" in k]
     
     # Colors/Markers for standard groups
     style_map = {
         "RCT Treatment": {"c": "blue", "marker": "o", "alpha": 0.4},
         "RCT Control":   {"c": "green", "marker": "o", "alpha": 0.4},
         "External":      {"c": "orange", "marker": "s", "alpha": 0.3},
-        "Matched":       {"c": "black", "marker": "x", "alpha": 0.8}
+        "Matched":       {"c": "black", "marker": "x", "alpha": 0.8},
+        "Fused":         {"c": "black", "marker": "x", "alpha": 0.8}
     }
     
     def get_style(label):
@@ -104,7 +105,7 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
         style = get_style(label)
         plt.scatter(X_pca[:, 0], X_pca[:, 1], label=label, **style)
 
-        if "Matched" in label:
+        if "Matched" in label or "Fused" in label:
             n_matched = X.shape[0]
 
 
@@ -139,15 +140,16 @@ def plot_covariate_2d_scatter_weighted(data_dict, weights, output_dir="plots"):
     pca = PCA(n_components=2)
     pca.fit(all_data)
     
-    base_keys = [k for k in data_dict.keys() if "Matched" not in k]
-    matched_keys = [k for k in data_dict.keys() if "Matched" in k]
+    base_keys = [k for k in data_dict.keys() if "Matched" not in k and "Fused" not in k]
+    matched_keys = [k for k in data_dict.keys() if "Matched" in k or "Fused" in k]
     
     # Colors/Markers for standard groups
     style_map = {
         "RCT Treatment": {"c": "blue", "marker": "o", "alpha": 0.4},
         "RCT Control":   {"c": "green", "marker": "o", "alpha": 0.4},
         "External":      {"c": "orange", "marker": "s", "alpha": 0.3},
-        "Matched":       {"c": "black", "marker": "x", "alpha": 0.8}
+        "Matched":       {"c": "black", "marker": "x", "alpha": 0.8},
+        "Fused":         {"c": "black", "marker": "x", "alpha": 0.8}
     }
     
     def get_style(label):
@@ -207,7 +209,7 @@ def plot_covariate_2d_scatter_weighted(data_dict, weights, output_dir="plots"):
         X_pca = pca.transform(X)
         style = get_style(label)
         plt.scatter(X_pca[:, 0], X_pca[:, 1], label=label, **style)
-        if "Matched" in label:
+        if "Matched" in label or "Fused" in label:
             n_matched = X.shape[0]
 
     plt.title(f"Weighted Covariate Scatter (PC1 vs PC2, n={n_matched})")
@@ -327,10 +329,6 @@ def plot_energy_comparison(results_dict, output_dir="plots"):
     plt.title("Energy Distance Comparison & Decomposition")
     
     # Combined Legend
-    # ErrorbarContainer (l_en) does not support get_label() directly in some versions, but we can extract handles
-    # or just use the handles returned.
-    
-    # Simply using fig.legend or extracting handles from axes
     h1, l1 = ax1.get_legend_handles_labels()
     h2, l2 = ax2.get_legend_handles_labels()
     ax1.legend(h1 + h2, l1 + l2, loc='upper right', fontsize='small', ncol=2)
@@ -386,6 +384,9 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
         mse = [b + v for b, v in zip(bias_sq, var)]
         energy = [r['mean_energy'] for r in results_list]
         
+        # New: Pooled Energy
+        pooled_en = [r.get('mean_pooled_energy', np.nan) for r in results_list]
+        
         fig, ax1 = plt.subplots(figsize=(10, 6))
         
         ax1.set_xlabel("N_SAMPLED")
@@ -399,12 +400,16 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
         
         ax2 = ax1.twinx()
         ax2.set_ylabel("Energy Distance", color='blue')
-        l4 = ax2.plot(n_samples, energy, label='Energy', color='blue', marker='d', linestyle='-.', linewidth=1.5)
+        l4 = ax2.plot(n_samples, energy, label='Energy (Current)', color='blue', marker='d', linestyle='-.', linewidth=1.5)
+        
+        # Plot Pooled Energy Reference
+        l5 = ax2.plot(n_samples, pooled_en, label='Energy (Pooled RCT)', color='black', marker='*', linestyle=':', linewidth=2)
+        
         ax2.tick_params(axis='y', labelcolor='blue')
         
-        lines = l1 + l2 + l3 + l4
+        lines = l1 + l2 + l3 + l4 + l5
         labels = [l.get_label() for l in lines]
-        ax1.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=4)
+        ax1.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=3)
         
         plt.title(f"Energy & MSE Decomposition: {method_name}")
         ax1.grid(True, alpha=0.3)
@@ -442,7 +447,9 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
         all_energies = []
         for m in methods_sorted:
             engs = [r['mean_energy'] for r in results_dict[m] if r['mean_energy'] is not None and not np.isnan(r['mean_energy'])]
+            pool_engs = [r.get('mean_pooled_energy', np.nan) for r in results_dict[m]]
             all_energies.extend(engs)
+            all_energies.extend([e for e in pool_engs if not np.isnan(e)])
             
         if all_energies:
             min_en, max_en = min(all_energies), max(all_energies)
@@ -458,6 +465,7 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
             var = [r['variance'] for r in results_list]
             mse = [b + v for b, v in zip(bias_sq, var)]
             energy = [r['mean_energy'] for r in results_list]
+            pooled_en = [r.get('mean_pooled_energy', np.nan) for r in results_list]
             
             ax1.set_xlabel("Samples")
             if i == 0:
@@ -472,7 +480,8 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
             ax1.set_title(method_name)
             
             ax2 = ax1.twinx()
-            l4 = ax2.plot(n_samples, energy, label='Energy', color='blue', marker='d', linestyle='-.', linewidth=1.5)
+            l4 = ax2.plot(n_samples, energy, label='Energy (Current)', color='blue', marker='d', linestyle='-.', linewidth=1.5)
+            l5 = ax2.plot(n_samples, pooled_en, label='Energy (Pooled)', color='black', marker='*', linestyle=':', linewidth=1.5)
             
             ax2.set_ylim(ylim_en)
             ax2.tick_params(axis='y', labelcolor='blue')
@@ -482,9 +491,9 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
             else:
                 ax2.set_ylabel("Energy Distance", color='blue')
 
-        lines = l1 + l2 + l3 + l4
+        lines = l1 + l2 + l3 + l4 + l5
         labels = [l.get_label() for l in lines]
-        fig.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=4)
+        fig.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=5)
         
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, "energy_MSE_combined.png"), bbox_inches='tight')

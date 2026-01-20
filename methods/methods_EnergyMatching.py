@@ -67,7 +67,10 @@ class EnergyAugmenter_Matching(BaseAugmenter):
             term2_ee = torch.dot(w, torch.mv(d_ee, w))
             
             # Internal-External interaction: Dot product
-            term2_ie = torch.dot(w, d_ie_sum) / n_i
+            if n_i > 0:
+                term2_ie = torch.dot(w, d_ie_sum) / n_i
+            else:
+                term2_ie = torch.tensor(0.0, device=device)
             
             term2 = (beta**2 * term2_ee + 
                      2 * (1 - beta) * beta * term2_ie) # Note: alpha = 1 - beta
