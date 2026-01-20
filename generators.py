@@ -2,31 +2,35 @@ import numpy as np
 from structures import PotentialOutcomes
 
 class DataGenerator:
-    def __init__(self, dim: int = 5):
+    def __init__(self, dim: int = 5, beta = None):
         self.dim = dim
-
+        if beta is None:
+            self.beta = np.random.uniform(1, 3, dim)
+        else:
+            self.beta = beta
     def _generate_covariates(self, n, mean, var):
         cov = np.eye(self.dim) * var
         return np.random.multivariate_normal(mean, cov, n)
 
-    def _generate_outcomes(self, X, beta=None, treatment_effect=None):
-        if beta is None:
-            beta = np.ones(self.dim)
-        if treatment_effect is None:
-            treatment_effect = 0.
+    def _generate_outcomes(self, X, treatment_effect=0., beta_bias=None):
+        """
+        Generates potential outcomes. 
+        beta_bias: Optional vector to add to the base beta (simulating concept drift).
+        """
         n = X.shape[0]
-        y0 = X @ beta + np.random.normal(0, 0.5, n)
+        
+        current_beta = self.beta if beta_bias is None else self.beta + beta_bias
+        y0 = X @ current_beta + np.random.normal(0, 0.5, n)
         y1 = y0 + treatment_effect
         return y0, y1
 
     def generate_rct_pool(self, n, mean, var, effect_size=1.0):
         X = self._generate_covariates(n, mean, var)
-        beta = np.random.uniform(-1, 1, self.dim)
-        Y0, Y1 = self._generate_outcomes(X, beta, effect_size)
+        Y0, Y1 = self._generate_outcomes(X, treatment_effect=effect_size, beta_bias=None)
         return PotentialOutcomes(X=X, Y0=Y0, Y1=Y1)
 
     def generate_external_pool(self, n, mean, var, beta_bias=0.0):
         X = self._generate_covariates(n, mean, var)
-        beta = np.random.uniform(-1, 1, self.dim) + beta_bias
-        Y0, _ = self._generate_outcomes(X, beta, 0) 
+        bias_vec = np.ones(self.dim) * beta_bias
+        Y0, _ = self._generate_outcomes(X, treatment_effect=0, beta_bias=bias_vec)
         return PotentialOutcomes(X=X, Y0=Y0, Y1=None)
