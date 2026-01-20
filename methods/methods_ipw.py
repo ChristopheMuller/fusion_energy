@@ -90,3 +90,6 @@ class IPWAugmenter:
             raise ValueError("Must call fit() before sample()")
 
         return None, None, self.weights_
+    
+    def get_internal_weights(self):
+        return self.weights_

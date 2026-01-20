@@ -10,6 +10,7 @@ from visualization import (
     plot_covariate_densities,
     plot_outcome_densities,
     plot_covariate_2d_scatter,
+    plot_covariate_2d_scatter_weighted,
     plot_error_boxplot,
     plot_energy_mse_method_decomposition,
     plot_treatment_effect_heterogeneity
@@ -221,6 +222,7 @@ def run_experiment():
         augmenter = MethodClass(n_sampled=best_n, lr=0.01, n_iter=200, **kwargs) 
         augmenter.fit(X_t, X_i, X_e)
         X_w, Y_w, _ = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
+        internal_weights = augmenter.get_internal_weights()
         
         X_dict_final = {
             "RCT Treatment": X_t,
@@ -248,6 +250,7 @@ def run_experiment():
         plot_outcome_densities(Y_dict_final, output_dir=f"plots/{method_name}")
         if DIM >= 2:
             plot_covariate_2d_scatter(X_dict_final, output_dir=f"plots/{method_name}")
+            plot_covariate_2d_scatter_weighted(X_dict_final, weights=internal_weights, output_dir=f"plots/{method_name}")
 
 if __name__ == "__main__":
     run_experiment()

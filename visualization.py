@@ -57,13 +57,13 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
     plt.figure(figsize=(10, 8))
     
     # Concatenate all data to fit PCA on the global distribution space
-    all_data_list = [X for X in data_dict.values() if X.shape[0] > 0]
-    if not all_data_list:
-        print("No data to plot.")
-        return
-        
-    all_data = np.vstack(all_data_list)
-    
+    all_data_rct = []
+    for key in data_dict.keys():
+        if "RCT" in key:
+            all_data_rct.append(data_dict[key])
+
+    all_data = np.vstack(all_data_rct)
+
     # Fit PCA
     pca = PCA(n_components=2)
     pca.fit(all_data)
@@ -116,6 +116,108 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
     plt.savefig(f"{output_dir}/covariate_scatter_pca.png")
     plt.close()
     print(f"PCA scatter plot saved to {output_dir}/")
+
+def plot_covariate_2d_scatter_weighted(data_dict, weights, output_dir="plots"):
+    """
+    Scatter plot of the first 2 Principal Components (PCA).
+    Points are sized according to 'weights'.
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    plt.figure(figsize=(10, 8))
+    
+    # Concatenate all data to fit PCA on the global distribution space
+    all_data_rct = []
+    for key in data_dict.keys():
+        if "RCT" in key:
+            all_data_rct.append(data_dict[key])
+
+    all_data = np.vstack(all_data_rct)
+    
+    # Fit PCA
+    pca = PCA(n_components=2)
+    pca.fit(all_data)
+    
+    base_keys = [k for k in data_dict.keys() if "Matched" not in k]
+    matched_keys = [k for k in data_dict.keys() if "Matched" in k]
+    
+    # Colors/Markers for standard groups
+    style_map = {
+        "RCT Treatment": {"c": "blue", "marker": "o", "alpha": 0.4},
+        "RCT Control":   {"c": "green", "marker": "o", "alpha": 0.4},
+        "External":      {"c": "orange", "marker": "s", "alpha": 0.3},
+        "Matched":       {"c": "black", "marker": "x", "alpha": 0.8}
+    }
+    
+    def get_style(label):
+        for key, style in style_map.items():
+            if key in label:
+                return style
+        return {"alpha": 0.5} # Default
+
+    # Helper to get subset weights
+    X_i = data_dict.get("RCT Control")
+    X_e = data_dict.get("External")
+    n_i = X_i.shape[0] if X_i is not None else 0
+    n_e = X_e.shape[0] if X_e is not None else 0
+    
+    # Plot base layers
+    for label in base_keys:
+        X = data_dict[label]
+        if X.shape[0] == 0:
+            continue
+        X_pca = pca.transform(X)
+        style = get_style(label)
+        
+        # Calculate sizes
+        s = 30 # Default size
+        
+        if weights is not None:
+            w_subset = None
+            if label == "External":
+                if len(weights) == n_e:
+                    w_subset = weights
+                elif len(weights) == n_i + n_e:
+                    w_subset = weights[n_i:]
+            elif label == "RCT Control":
+                if len(weights) == n_i + n_e:
+                    w_subset = weights[:n_i]
+            
+            if w_subset is not None and len(w_subset) > 0:
+                # Normalize for visibility: mean size 30
+                # Avoid div by zero
+                w_mean = np.mean(w_subset)
+                if w_mean > 1e-9:
+                    s = 30 * (w_subset / w_mean)
+                else:
+                    s = 30 # Fallback
+                
+                # Clip extremely large sizes
+                s = np.clip(s, 1, 300)
+
+        plt.scatter(X_pca[:, 0], X_pca[:, 1], s=s, label=label, **style)
+
+    # Plot matched overlay
+    n_matched = 0
+    for label in matched_keys:
+        X = data_dict[label]
+        if X.shape[0] == 0:
+            continue
+        X_pca = pca.transform(X)
+        style = get_style(label)
+        plt.scatter(X_pca[:, 0], X_pca[:, 1], label=label, **style)
+        if "Matched" in label:
+            n_matched = X.shape[0]
+
+    plt.title(f"Weighted Covariate Scatter (PC1 vs PC2, n={n_matched})")
+    plt.xlabel(f"PC1 ({pca.explained_variance_ratio_[0]:.1%} var)")
+    plt.ylabel(f"PC2 ({pca.explained_variance_ratio_[1]:.1%} var)")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f"{output_dir}/covariate_scatter_weighted_pca.png")
+    plt.close()
+    print(f"Weighted PCA scatter plot saved to {output_dir}/")
 
 def plot_treatment_effect_heterogeneity(X, true_tau_values, output_dir="plots"):
     tau_dir = os.path.join(output_dir, "tau")

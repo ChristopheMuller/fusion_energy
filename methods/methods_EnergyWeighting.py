@@ -90,6 +90,9 @@ class EnergyAugmenter_Weighting:
         # If Ys are provided, stack them too
         if Y_internal is not None and Y_external is not None:
             Y_pool = np.concatenate([Y_internal, Y_external])
-            return X_pool, Y_pool, self.weights_
+            return None, None, self.weights_
         
-        return X_pool, self.weights_
+        return None, self.weights_
+    
+    def get_internal_weights(self):
+        return self.weights_

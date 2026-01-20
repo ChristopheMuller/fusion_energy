@@ -132,3 +132,6 @@ class EnergyAugmenter_MatchingReg:
             return X_fused, Y_fused, weights
             
         return X_fused, weights
+
+    def get_internal_weights(self):
+        return self.weights_
