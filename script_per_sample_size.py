@@ -52,30 +52,17 @@ def process_repetition(rep_id, n_sampled_list, n_rct, n_ext, dim, rct_bias, ext_
     for n_samp in n_sampled_list:
         for method_name, (MethodClass, kwargs) in METHODS_CONFIG.items():
             # 2. Fit and Sample Method for each n_sampled
-            # Target is RCT (full), Internal is Empty.
             augmenter = MethodClass(n_sampled=n_samp, lr=0.01, n_iter=200, **kwargs) 
             
-            # Pass empty Internal Control
             X_empty = np.empty((0, dim))
             augmenter.fit(X_rct, X_empty, X_e)
-            
-            # Sample/Weight
-            # Y_empty corresponds to Internal outcomes (none)
             Y_empty = np.empty((0,))
             X_fused, Y_fused, weights = augmenter.sample(X_rct, X_empty, X_e, Y_empty, Y_e)
             
             # 3. Random Split of RCT
-            if method_name.startswith("IPW") or method_name.startswith("En.Weighting"):
-                 # Using all external data (weighted)
-                 n_chosen = X_e.shape[0]
-            else:
-                 # Matching methods select n_sampled
-                 n_chosen = n_samp
+            n_chosen = n_samp
             
-            # Ensure balanced design: n_treated approx equal to total control size (internal + chosen external)
             n_treat_target = int((n_rct + n_chosen) / 2)
-            
-            # Ensure boundaries
             n_treat_target = max(1, min(n_rct - 1, n_treat_target))
             
             # Random shuffle indices
@@ -86,10 +73,10 @@ def process_repetition(rep_id, n_sampled_list, n_rct, n_ext, dim, rct_bias, ext_
             idx_c = indices[n_treat_target:]
             
             X_t_sim = X_rct[idx_t]
-            Y_t_sim = Y1_rct[idx_t] # Observed Y for Treated is Y1
+            Y_t_sim = Y1_rct[idx_t]
             
             X_c_sim = X_rct[idx_c]
-            Y_c_sim = Y0_rct[idx_c] # Observed Y for Control is Y0
+            Y_c_sim = Y0_rct[idx_c]
             
             # 4. Estimate ATT
             if "Matching" in method_name:
@@ -104,11 +91,11 @@ def process_repetition(rep_id, n_sampled_list, n_rct, n_ext, dim, rct_bias, ext_
                 en_w, d12, d11, d22 = compute_weighted_energy_distance(X_control_total, X_t_sim, w_total)
 
             else:
-                
+                # IPW: Scale weights so they sum to n_chosen (which is n_samp)
                 w_ext_norm = weights # sum to 1
-                w_ext_scaled = w_ext_norm * n_chosen # sum to n_chosen
+                w_ext_scaled = w_ext_norm * n_chosen # sum to n_samp
                 
-                w_c = np.ones(len(Y_c_sim)) # weight 1 each
+                w_c = np.ones(len(Y_c_sim)) # weight 1 each for RCT controls
                 
                 w_total = np.concatenate([w_c, w_ext_scaled])
                 w_total = w_total / np.sum(w_total) # normalize total
