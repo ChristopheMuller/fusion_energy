@@ -2,11 +2,10 @@ import numpy as np
 from joblib import Parallel, delayed
 from collections import defaultdict
 from data_gen import create_complex_dataset
-from methods import EnergyAugmenter_Matching, EnergyAugmenter_PooledTarget, EnergyAugmenter_MatchingReg, IPWAugmenter, EnergyAugmenter_Weighting
+from methods import EnergyAugmenter_PooledTarget, IPWAugmenter
 from utils import compute_energy_distance_numpy, compute_weighted_energy_distance
 from visualization import (
     plot_bias_variance_comparison,
-    plot_energy_comparison,
     plot_covariate_densities,
     plot_outcome_densities,
     plot_covariate_2d_scatter,
@@ -18,61 +17,127 @@ from visualization import (
 
 # --- Global Configuration ---
 METHODS_CONFIG = {
-    "En.Matching_005k": (EnergyAugmenter_Matching, {'k_best': 5}),
-    "En.Matching_100k": (EnergyAugmenter_Matching, {'k_best': 100}),
+    "En.Matching_Pooled.005": (EnergyAugmenter_PooledTarget, {'k_best': 5}),
+    "En.Matching_Pooled.100": (EnergyAugmenter_PooledTarget, {'k_best': 100}),
     "IPW": (IPWAugmenter, {}),
-    "En.Weighting": (EnergyAugmenter_Weighting, {})
 }
 
 def tau_fn(X):
     return np.ones(X.shape[0]) *  1.5
 
-def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var, tau):
+def process_repetition(rep_id, n_sampled_list, n_rct, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var, tau):
     """
     Runs a single simulation repetition:
-    1. Generates a fresh dataset.
+    1. Generates a fresh dataset (Full RCT + External).
     2. Loops through all requested sample sizes to fit and sample.
+    3. Randomly splits RCT into Treated/Control depending on external sample size.
     
     Returns a list of result dictionaries for each n_sampled.
     """
     # 1. Generate NEW Data
-    data = create_complex_dataset(n_treat, n_ctrl, n_ext, dim, tau, rct_bias=rct_bias, ext_bias=ext_bias, rct_var=rct_var, ext_var=ext_var)
+    # We generate all RCT data as "target" in the helper, and 0 for internal control
+    data = create_complex_dataset(n_rct, 0, n_ext, dim, tau, rct_bias=rct_bias, ext_bias=ext_bias, rct_var=rct_var, ext_var=ext_var)
 
-    X_t = data["target"]["X"]
-    X_i = data["internal"]["X"]
-    X_e = data["external"]["X"]
-    Y_t = data["target"]["Y"]
-    Y_i = data["internal"]["Y"]
-    Y_e = data["external"]["Y"]
+    X_rct = data["target"]["X"]
+    Y_rct = data["target"]["Y"] 
     
-    true_att = data['true_att']
+    # We need Y(0) for the control arm. Since create_complex_dataset returns observed Y (which includes treatment effect for target),
+    # we reconstruct Y(0) by subtracting the treatment effect.
+    Y1_rct = data["target"]["Y"]
+    
+    if callable(tau):
+        tau_vals = tau(X_rct)
+    else:
+        tau_vals = tau
+        
+    Y0_rct = Y1_rct - tau_vals
+    
+    X_e = data["external"]["X"]
+    Y_e = data["external"]["Y"] # This is Y(0) for external (untreated)
+    
+    # True ATT on the RCT population
+    true_att = data['true_att'] 
     
     rep_results = []
     
     for n_samp in n_sampled_list:
         for method_name, (MethodClass, kwargs) in METHODS_CONFIG.items():
             # 2. Fit and Sample Method for each n_sampled
+            # Target is RCT (full), Internal is Empty.
             augmenter = MethodClass(n_sampled=n_samp, lr=0.01, n_iter=200, **kwargs) 
-            augmenter.fit(X_t, X_i, X_e)
             
-            # Updated to unpack weights
-            X_w, Y_w, weights = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
+            # Pass empty Internal Control
+            X_empty = np.empty((0, dim))
+            augmenter.fit(X_rct, X_empty, X_e)
             
-            # Compute ATT using weighted sum estimator
-            Y_control_full = np.concatenate([Y_i, Y_e])
-            mu_control_weighted = np.sum(weights * Y_control_full)
+            # Sample/Weight
+            # Y_empty corresponds to Internal outcomes (none)
+            Y_empty = np.empty((0,))
+            X_fused, Y_fused, weights = augmenter.sample(X_rct, X_empty, X_e, Y_empty, Y_e)
             
-            att_w = np.mean(Y_t) - mu_control_weighted
+            # 3. Random Split of RCT
+            if method_name.startswith("IPW") or method_name.startswith("En.Weighting"):
+                 # Using all external data (weighted)
+                 n_chosen = X_e.shape[0]
+            else:
+                 # Matching methods select n_sampled
+                 n_chosen = n_samp
             
-            # Unify Energy Calculation:
-            X_control_full = np.vstack([X_i, X_e])
-            en_w, d12, d11, d22 = compute_weighted_energy_distance(X_control_full, X_t, weights)
+            # Ensure balanced design: n_treated approx equal to total control size (internal + chosen external)
+            n_treat_target = int((n_rct + n_chosen) / 2)
             
+            # Ensure boundaries
+            n_treat_target = max(1, min(n_rct - 1, n_treat_target))
+            
+            # Random shuffle indices
+            indices = np.arange(n_rct)
+            np.random.shuffle(indices)
+            
+            idx_t = indices[:n_treat_target]
+            idx_c = indices[n_treat_target:]
+            
+            X_t_sim = X_rct[idx_t]
+            Y_t_sim = Y1_rct[idx_t] # Observed Y for Treated is Y1
+            
+            X_c_sim = X_rct[idx_c]
+            Y_c_sim = Y0_rct[idx_c] # Observed Y for Control is Y0
+            
+            # 4. Estimate ATT
+            if "Matching" in method_name:
+                Y_control_total = np.concatenate([Y_c_sim, Y_fused])
+                mu_control = np.mean(Y_control_total)
+                
+                att_est = np.mean(Y_t_sim) - mu_control
+                
+                X_control_total = np.vstack([X_c_sim, X_fused])
+                w_total = np.ones(len(X_control_total)) / len(X_control_total)
+                
+                en_w, d12, d11, d22 = compute_weighted_energy_distance(X_control_total, X_t_sim, w_total)
+
+            else:
+                
+                w_ext_norm = weights # sum to 1
+                w_ext_scaled = w_ext_norm * n_chosen # sum to n_chosen
+                
+                w_c = np.ones(len(Y_c_sim)) # weight 1 each
+                
+                w_total = np.concatenate([w_c, w_ext_scaled])
+                w_total = w_total / np.sum(w_total) # normalize total
+                
+                Y_total = np.concatenate([Y_c_sim, Y_e])
+                mu_control = np.sum(w_total * Y_total)
+                
+                att_est = np.mean(Y_t_sim) - mu_control
+                
+                # Energy Distance for plotting/metrics
+                X_control_total = np.vstack([X_c_sim, X_e])
+                en_w, d12, d11, d22 = compute_weighted_energy_distance(X_control_total, X_t_sim, w_total)
+
             rep_results.append({
                 'method': method_name,
                 'n_sample': n_samp,
                 'true_tau': true_att,
-                'att': att_w,
+                'att': att_est,
                 'en': en_w,
                 'd12': d12,
                 'd11': d11,
@@ -83,8 +148,7 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
 
 def run_experiment():
 
-    N_TREAT = 100
-    N_CTRL_RCT = 100
+    N_RCT = 200
     N_EXT_POOL = 1000
 
     DIM = 3
@@ -106,7 +170,7 @@ def run_experiment():
 
     # Run K_REP independent simulations in parallel
     all_reps_results = Parallel(n_jobs=-1, verbose=5)(
-        delayed(process_repetition)(k, N_SAMPLED_LIST, N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, RCT_BIAS, EXT_BIAS, RCT_VAR, EXT_VAR, TAU)
+        delayed(process_repetition)(k, N_SAMPLED_LIST, N_RCT, N_EXT_POOL, DIM, RCT_BIAS, EXT_BIAS, RCT_VAR, EXT_VAR, TAU)
         for k in range(K_REP)
     )
     
@@ -185,72 +249,10 @@ def run_experiment():
     print("Generating Comparison Plots...")
     
     plot_bias_variance_comparison(results_dict)
-    plot_energy_comparison(results_dict)
     plot_energy_mse_method_decomposition(results_dict)
     plot_error_boxplot(raw_errors_dict)
     
-    # Determine best N (min MSE) for each method
-    best_n_per_method = {}
-    print("\nBest Sample Sizes per Method (min MSE):")
-    for method_name, res_list in results_dict.items():
-        # entries have 'bias', 'variance', 'n_sample'
-        best_entry = min(res_list, key=lambda x: x['bias']**2 + x['variance'])
-        best_n_per_method[method_name] = best_entry['n_sample']
-        mse = best_entry['bias']**2 + best_entry['variance']
-        print(f"  {method_name}: N={best_entry['n_sample']} (MSE={mse:.4f})")
-
-    # Generate detailed plots for ONE representative run (locally) but for ALL methods
-    print("Generating detailed density plots for a single example run (all methods)...")
-    data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, TAU, rct_bias=RCT_BIAS, ext_bias=EXT_BIAS, rct_var=RCT_VAR, ext_var=EXT_VAR)
-    
-    X_t = data["target"]["X"]
-    
-    if callable(TAU):
-        print("Plotting treatment effect heterogeneity...")
-        tau_vals = TAU(X_t)
-        plot_treatment_effect_heterogeneity(X_t, tau_vals, output_dir="plots")
-
-    Y_t = data["target"]["Y"]
-    X_i = data["internal"]["X"]
-    Y_i = data["internal"]["Y"]
-    X_e = data["external"]["X"]
-    Y_e = data["external"]["Y"]
-        
-    for method_name, (MethodClass, kwargs) in METHODS_CONFIG.items():
-        best_n = best_n_per_method.get(method_name, N_SAMPLED_LIST[-1])
-        print(f"Plotting densities for {method_name} (using Best N={best_n})...")
-        augmenter = MethodClass(n_sampled=best_n, lr=0.01, n_iter=200, **kwargs) 
-        augmenter.fit(X_t, X_i, X_e)
-        X_w, Y_w, _ = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
-        internal_weights = augmenter.get_internal_weights()
-        
-        X_dict_final = {
-            "RCT Treatment": X_t,
-            "RCT Control": X_i,
-            "External": X_e
-        }
-        Y_dict_final = {
-            "RCT Treatment": Y_t,
-            "RCT Control": Y_i,
-            "External": Y_e
-        }
-        
-        # Only add Matched Sample if it exists (i.e. not IPW or weighting method that returns None)
-        if X_w is not None and Y_w is not None:
-            X_matched = X_w
-            Y_matched = Y_w
-            # remove RCT control from matched if present
-            X_matched = X_matched[~np.isin(X_matched, X_i).all(axis=1)]
-            Y_matched = Y_matched[~np.isin(X_w, X_i).all(axis=1)]
-            X_dict_final[f"Matched ({method_name})"] = X_matched
-            Y_dict_final[f"Matched ({method_name})"] = Y_w
-        
-        # Save in method specific folder
-        plot_covariate_densities(X_dict_final, DIM, output_dir=f"plots/{method_name}")
-        plot_outcome_densities(Y_dict_final, output_dir=f"plots/{method_name}")
-        if DIM >= 2:
-            plot_covariate_2d_scatter(X_dict_final, output_dir=f"plots/{method_name}")
-            plot_covariate_2d_scatter_weighted(X_dict_final, weights=internal_weights, output_dir=f"plots/{method_name}")
+    print("Detailed density plots skipped as per new setup instructions.")
 
 if __name__ == "__main__":
     run_experiment()

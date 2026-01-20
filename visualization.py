@@ -286,61 +286,6 @@ def plot_bias_variance_comparison(results_dict, output_dir="plots"):
     
     print(f"Bias and Variance comparison plots saved to {output_dir}/")
 
-def plot_energy_comparison(results_dict, output_dir="plots"):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-        
-    colors = ['blue', 'red', 'green', 'purple', 'orange', 'cyan']
-    markers = ['o', 's', '^', 'D', 'v', 'x']
-    styles = list(zip(colors, markers))
-    
-    fig, ax1 = plt.subplots(figsize=(12, 7))
-    ax2 = ax1.twinx()
-    
-    lines = []
-    
-    for i, (method_name, results_list) in enumerate(results_dict.items()):
-        n_samples = [r['n_sample'] for r in results_list]
-        en = [r['mean_energy'] for r in results_list]
-        std = [r['std_energy'] for r in results_list]
-        
-        c, m = styles[i % len(styles)]
-        
-        # Plot Total Energy on Left Axis
-        l_en = ax1.errorbar(n_samples, en, yerr=std, fmt=f'-{m}', color=c, 
-                     label=f'{method_name} (Total Energy)', capsize=5, alpha=0.8, linewidth=2)
-        lines.append(l_en)
-        
-        # Add decomposition on Right Axis if available
-        if all(k in results_list[0] for k in ['mean_d12', 'mean_d11']):
-            d12 = [r['mean_d12'] for r in results_list]
-            d11 = [r['mean_d11'] for r in results_list]
-            
-            l_d12, = ax2.plot(n_samples, d12, linestyle='--', color=c, alpha=0.5, label=f'{method_name}: d12')
-            l_d11, = ax2.plot(n_samples, d11, linestyle=':', color=c, alpha=0.5, label=f'{method_name}: d11')
-            lines.extend([l_d12, l_d11])
-    
-    ax1.set_xlabel("N_SAMPLED")
-    ax1.set_ylabel("Total Energy Distance")
-    ax2.set_ylabel("Component Distances (d12, d11)")
-    
-    plt.title("Energy Distance Comparison & Decomposition")
-    
-    # Combined Legend
-    # ErrorbarContainer (l_en) does not support get_label() directly in some versions, but we can extract handles
-    # or just use the handles returned.
-    
-    # Simply using fig.legend or extracting handles from axes
-    h1, l1 = ax1.get_legend_handles_labels()
-    h2, l2 = ax2.get_legend_handles_labels()
-    ax1.legend(h1 + h2, l1 + l2, loc='upper right', fontsize='small', ncol=2)
-    
-    ax1.grid(True, alpha=0.3)
-    plt.savefig(f"{output_dir}/energy_comparison.png")
-    plt.close()
-    
-    print(f"Energy comparison plot saved to {output_dir}/")
-
 def plot_error_boxplot(raw_errors_dict, output_dir="plots"):
     """
     Plots boxplots of the Estimation Error (Est - True) distribution as n increases for all methods.
@@ -429,7 +374,7 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
             mse_chk = bsq + var
             
             # If constant (std ~ 0), it is a weighting method (independent of n_sampled)
-            if len(mse_chk) > 1 and np.std(mse_chk) < 1e-8:
+            if len(mse_chk) > 1 and np.std(mse_chk) < 1e-2:
                 width_ratios.append(2.5)
             else:
                 width_ratios.append(5.5)
