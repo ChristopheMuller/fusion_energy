@@ -308,13 +308,13 @@ def plot_energy_mse_method_decomposition(results_dict, output_dir="plots"):
         ax1.grid(True, alpha=0.3)
         plt.tight_layout()
         
-        safe_name = method_name.replace(' ', '_').replace('-', '_')
-        filename = f"energy_MSE_{safe_name}.png"
-        plt.savefig(os.path.join(output_dir, filename))
+        filename = f"energy_MSE.png"
+        out_dir_method = os.path.join(output_dir, method_name)
+        if not os.path.exists(out_dir_method):
+            os.makedirs(out_dir_method)
+        plt.savefig(os.path.join(out_dir_method, filename))
         plt.close()
         
-    print(f"Individual Energy & MSE plots saved to {output_dir}/energy_MSE_*.png")
-
     n_methods = len(results_dict)
     if n_methods > 0:
         methods_sorted = sorted(results_dict.keys())
