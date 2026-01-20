@@ -8,21 +8,17 @@ from typing import List
 
 @dataclass
 class SimLog:
-    """Stores errors from each simulation run"""
+    """Stores bias from each simulation run"""
     errors: List[float] = field(default_factory=list)
-    biases: List[float] = field(default_factory=list) # Raw difference (Est - True)
     estimates: List[float] = field(default_factory=list)
 
     def compute_metrics(self):
         errors_arr = np.array(self.errors)
-        biases_arr = np.array(self.biases)
         
-        mse = np.mean(errors_arr) # This assumes error was squared before storing, or we calc here
-        mse = np.mean(biases_arr**2)
-        avg_bias = np.mean(biases_arr)
-        
-        variance = np.var(biases_arr)
-        
+        mse = np.mean(errors_arr**2)
+        avg_bias = np.mean(errors_arr)
+        variance = np.var(self.estimates) # Variance of the estimator
+
         return {
             "MSE": mse,
             "Bias^2": avg_bias**2,
@@ -35,36 +31,50 @@ def run_monte_carlo(n_sims=100):
     gen = DataGenerator(dim=5, beta = np.ones(5))
     
     logs = {
+        "NoAug_InternalOnly": SimLog(),
         "Fixed_EnergyMatch": SimLog(),
-        "Optimized_IPW": SimLog()
+        "OptimalN_IPW": SimLog()
     }
 
     print(f"Starting simulation with {n_sims} iterations...")
 
     for i in range(n_sims):
+        if (i+1) % 10 == 0:
+            print(f"  ... iter {i+1}/{n_sims}")
         # 1. Generate Data (New samples, same mechanism)
         rct_data = gen.generate_rct_pool(n=500, mean=np.ones(5), var=1.0)
         ext_data = gen.generate_external_pool(n=2000, mean=np.ones(5)*1.2, var=1.5, beta_bias=0.1)
 
-        # --- Method 1: Fixed Ratio + Energy Matching ---
+        # --- Method 0: No Augmentation (Internal Only) ---
+        design_no_aug = FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=0)
+        split_no_aug = design_no_aug.split(rct_data, ext_data)
+        
+        # IPW estimator with target_n_aug=0 defaults to internal-only mean
+        est_no_aug = IPWEstimator() 
+        res_no_aug = est_no_aug.estimate(split_no_aug)
+        
+        logs["NoAug_InternalOnly"].errors.append(res_no_aug.bias)
+        logs["NoAug_InternalOnly"].estimates.append(res_no_aug.ate_est)
+
+        # --- Method 1: Fixed Augmentation + Energy Matching ---
         design_fixed = FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=100)
         split_fixed = design_fixed.split(rct_data, ext_data)
         
         est_match = EnergyMatchingEstimator()
-        res_fixed = est_match.estimate(split_fixed)
+        res_match = est_match.estimate(split_fixed)
         
-        logs["Fixed_EnergyMatch"].biases.append(res_fixed.bias) # bias here is (est - true_sate)
-        logs["Fixed_EnergyMatch"].estimates.append(res_fixed.ate_est)
+        logs["Fixed_EnergyMatch"].errors.append(res_match.bias)
+        logs["Fixed_EnergyMatch"].estimates.append(res_match.ate_est)
 
         # --- Method 2: Energy Optimized Split + IPW ---
-        design_opt = EnergyOptimizedDesign()
+        design_opt = EnergyOptimizedDesign(n_min=50, n_max=500, k_folds=3, n_iter=200)
         split_opt = design_opt.split(rct_data, ext_data)
         
         est_ipw = IPWEstimator()
-        res_opt = est_ipw.estimate(split_opt)
+        res_ipw = est_ipw.estimate(split_opt)
         
-        logs["Optimized_IPW"].biases.append(res_opt.bias)
-        logs["Optimized_IPW"].estimates.append(res_opt.ate_est)
+        logs["OptimalN_IPW"].errors.append(res_ipw.bias)
+        logs["OptimalN_IPW"].estimates.append(res_ipw.ate_est)
 
     # Report
     print("\n--- Simulation Results ---")
@@ -74,9 +84,9 @@ def run_monte_carlo(n_sims=100):
         metrics["Method"] = method_name
         results.append(metrics)
     
-    df_results = pd.DataFrame(results)
+    df_results = pd.DataFrame(results).sort_values("MSE")
     cols = ["Method", "MSE", "Bias^2", "Variance"]
     print(df_results[cols].to_string(index=False))
 
 if __name__ == "__main__":
-    run_monte_carlo(n_sims=50)
+    run_monte_carlo(n_sims=10)
