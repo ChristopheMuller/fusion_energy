@@ -1,15 +1,16 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+from .base import BaseAugmenter
 
-class EnergyAugmenter_MatchingReg:
+class EnergyAugmenter_MatchingReg(BaseAugmenter):
     def __init__(self, n_sampled=100, k_best=100, lr=0.01, n_iter=500, lambda_mean=10.0):
+        super().__init__()
         self.n_sampled = n_sampled
         self.k_best = k_best
         self.lr = lr
         self.n_iter = n_iter
         self.lambda_mean = lambda_mean  # New hyperparameter
-        self.weights_ = None
         
     def fit(self, X_target, X_internal, X_external):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -132,6 +133,3 @@ class EnergyAugmenter_MatchingReg:
             return X_fused, Y_fused, weights
             
         return X_fused, weights
-
-    def get_internal_weights(self):
-        return self.weights_

@@ -1,8 +1,9 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+from .base import BaseAugmenter
 
-class EnergyAugmenter_Weighting:
+class EnergyAugmenter_Weighting(BaseAugmenter):
     """
     Learns weights for a combined pool (Internal + External) to minimize 
     Energy Distance to the Target distribution.
@@ -12,11 +13,11 @@ class EnergyAugmenter_Weighting:
     - Returns weights for the full combined dataset.
     """
     def __init__(self, n_sampled=None, lr=0.01, n_iter=500, device=None, **kwargs):
+        super().__init__()
         # n_sampled is unused for weighting logic but kept for interface compatibility
         self.n_sampled = n_sampled
         self.lr = lr
         self.n_iter = n_iter
-        self.weights_ = None
         self.device = device if device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
     def fit(self, X_target, X_control, X_external):
@@ -93,6 +94,3 @@ class EnergyAugmenter_Weighting:
             return None, None, self.weights_
         
         return None, self.weights_
-    
-    def get_internal_weights(self):
-        return self.weights_

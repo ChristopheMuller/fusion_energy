@@ -2,8 +2,9 @@ import numpy as np
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
+from .base import BaseAugmenter
 
-class IPWAugmenter:
+class IPWAugmenter(BaseAugmenter):
     """
     Robust IPW implementation wrapped in the Augmenter API.
 
@@ -28,10 +29,10 @@ class IPWAugmenter:
                                           quantile (e.g., 0.99) to prevent outliers.
             cv (int): Number of folds for cross-validation in propensity model.
         """
+        super().__init__()
         self.clip_min = clip_min
         self.clip_max = clip_max
         self.weight_trim_quantile = weight_trim_quantile
-        self.weights_ = None
         
         # Pipeline: Scaling is crucial for Regularization (L2) to work effectively
         self.model = make_pipeline(
@@ -90,6 +91,3 @@ class IPWAugmenter:
             raise ValueError("Must call fit() before sample()")
 
         return None, None, self.weights_
-    
-    def get_internal_weights(self):
-        return self.weights_
