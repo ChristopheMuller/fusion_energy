@@ -24,12 +24,8 @@ METHODS_CONFIG = {
 }
 
 def tau_fn(X):
-    """
-    Heterogeneous Treatment Effect:
-    2.5 if X[0] < 0
-    1.5 if X[0] >= 0
-    """
-    return np.where(X[:, 0] < 0, 2.5, 1.5)
+    X1_stand = (X[:, 0] - np.mean(X[:, 0])) / np.std(X[:, 0])
+    return 1+0.5 * X1_stand
 
 def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var, tau):
     """
@@ -244,7 +240,7 @@ def run_experiment():
             X_matched = X_matched[~np.isin(X_matched, X_i).all(axis=1)]
             Y_matched = Y_matched[~np.isin(X_w, X_i).all(axis=1)]
             X_dict_final[f"Matched ({method_name})"] = X_matched
-            Y_dict_final[f"Matched ({method_name})"] = Y_matched
+            Y_dict_final[f"Matched ({method_name})"] = Y_w
         
         # Save in method specific folder
         plot_covariate_densities(X_dict_final, DIM, output_dir=f"plots/{method_name}")
