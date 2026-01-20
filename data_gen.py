@@ -4,7 +4,7 @@ def generate_covariates(n, dim, mean, var):
     cov = np.eye(dim) * var
     return np.random.multivariate_normal(mean, cov, n)
 
-def generate_outcomes_nonlinear(X, treatment_effect, beta=None):
+def generate_outcomes(X, treatment_effect, beta=None):
     # Y depends on X linearly
     n, d = X.shape
     
@@ -18,21 +18,6 @@ def generate_outcomes_nonlinear(X, treatment_effect, beta=None):
         effect = treatment_effect
         
     y1 = y0 + effect
-
-    # y0 = np.zeros(n)
-    # if d >= 1:
-    #     y0 += np.sin(X[:, 0])
-    # if d >= 2:
-    #     y0 += np.log(np.abs(X[:, 1]) + 1)
-    # if d >= 3:
-    #     y0 += X[:, 2] ** 2
-    # if d >= 4:
-    #     y0 += np.exp(-X[:, 3] ** 2 / 2)
-    # if d >= 6:
-    #     y0 += np.ones(d-4) @ X[:, 4:d].T
-
-    # y1 = y0 + treatment_effect
-
     return y0, y1
 
 def create_complex_dataset(n_treat, n_control_rct, n_external, dim, tau, rct_bias=0., ext_bias=1., rct_var=1.0, ext_var=2.0):
@@ -50,16 +35,15 @@ def create_complex_dataset(n_treat, n_control_rct, n_external, dim, tau, rct_bia
 
     # Outcomes
     beta = np.ones(dim)
-    Y0_target, Y_target = generate_outcomes_nonlinear(X_target, tau, beta=beta)
-    Y0_control, _ = generate_outcomes_nonlinear(X_control, tau, beta=beta)
-    Y0_ext, _ = generate_outcomes_nonlinear(X_ext, tau, beta=beta)
+    Y0_target, Y1_target = generate_outcomes(X_target, tau, beta=beta)
+    Y0_control, Y1_control = generate_outcomes(X_control, tau, beta=beta)
+    Y0_ext, Y1_ext = generate_outcomes(X_ext, tau, beta=beta)
 
-    true_att = np.mean(Y_target - Y0_target)
+    true_att = np.mean(Y1_target - Y0_target)
 
     return {
-        "target": {"X": X_target, "Y": Y_target},
-        "internal": {"X": X_control, "Y": Y0_control},
-        "external": {"X": X_ext, "Y": Y0_ext},
-        "tau": tau,
+        "target": {"X": X_target, "Y0": Y0_target, "Y1": Y1_target, "Y": Y1_target},
+        "internal": {"X": X_control, "Y0": Y0_control, "Y1": Y1_control, "Y": Y0_control},
+        "external": {"X": X_ext, "Y0": Y0_ext, "Y1": Y1_ext, "Y": Y0_ext},
         "true_att": true_att
     }

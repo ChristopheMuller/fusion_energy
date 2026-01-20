@@ -35,25 +35,14 @@ def process_repetition(rep_id, n_sampled_list, n_rct, n_ext, dim, rct_bias, ext_
     Returns a list of result dictionaries for each n_sampled.
     """
     # 1. Generate NEW Data
-    # We generate all RCT data as "target" in the helper, and 0 for internal control
     data = create_complex_dataset(n_rct, 0, n_ext, dim, tau, rct_bias=rct_bias, ext_bias=ext_bias, rct_var=rct_var, ext_var=ext_var)
 
     X_rct = data["target"]["X"]
-    Y_rct = data["target"]["Y"] 
-    
-    # We need Y(0) for the control arm. Since create_complex_dataset returns observed Y (which includes treatment effect for target),
-    # we reconstruct Y(0) by subtracting the treatment effect.
-    Y1_rct = data["target"]["Y"]
-    
-    if callable(tau):
-        tau_vals = tau(X_rct)
-    else:
-        tau_vals = tau
-        
-    Y0_rct = Y1_rct - tau_vals
+    Y0_rct = data["target"]["Y0"]
+    Y1_rct = data["target"]["Y1"]
     
     X_e = data["external"]["X"]
-    Y_e = data["external"]["Y"] # This is Y(0) for external (untreated)
+    Y_e = data["external"]["Y"]
     
     # True ATT on the RCT population
     true_att = data['true_att'] 
