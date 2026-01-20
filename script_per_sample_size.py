@@ -16,7 +16,7 @@ from visualization import (
 
 # --- Global Configuration ---
 METHODS_CONFIG = {
-    "En.PooledTarget_100k": (EnergyAugmenter_PooledTarget, {'k_best': 100}),
+    "En.Matching_005k": (EnergyAugmenter_Matching, {'k_best': 5}),
     "En.Matching_100k": (EnergyAugmenter_Matching, {'k_best': 100}),
     "IPW": (IPWAugmenter, {}),
     "En.Weighting": (EnergyAugmenter_Weighting, {})
@@ -182,6 +182,16 @@ def run_experiment():
     plot_energy_mse_method_decomposition(results_dict)
     plot_error_boxplot(raw_errors_dict)
     
+    # Determine best N (min MSE) for each method
+    best_n_per_method = {}
+    print("\nBest Sample Sizes per Method (min MSE):")
+    for method_name, res_list in results_dict.items():
+        # entries have 'bias', 'variance', 'n_sample'
+        best_entry = min(res_list, key=lambda x: x['bias']**2 + x['variance'])
+        best_n_per_method[method_name] = best_entry['n_sample']
+        mse = best_entry['bias']**2 + best_entry['variance']
+        print(f"  {method_name}: N={best_entry['n_sample']} (MSE={mse:.4f})")
+
     # Generate detailed plots for ONE representative run (locally) but for ALL methods
     print("Generating detailed density plots for a single example run (all methods)...")
     data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, TAU, rct_bias=RCT_BIAS, ext_bias=EXT_BIAS, rct_var=RCT_VAR, ext_var=EXT_VAR)
@@ -192,12 +202,11 @@ def run_experiment():
     Y_i = data["internal"]["Y"]
     X_e = data["external"]["X"]
     Y_e = data["external"]["Y"]
-    
-    last_n = N_SAMPLED_LIST[-1]
-    
+        
     for method_name, (MethodClass, kwargs) in METHODS_CONFIG.items():
-        print(f"Plotting densities for {method_name}...")
-        augmenter = MethodClass(n_sampled=last_n, lr=0.01, n_iter=200, **kwargs) 
+        best_n = best_n_per_method.get(method_name, N_SAMPLED_LIST[-1])
+        print(f"Plotting densities for {method_name} (using Best N={best_n})...")
+        augmenter = MethodClass(n_sampled=best_n, lr=0.01, n_iter=200, **kwargs) 
         augmenter.fit(X_t, X_i, X_e)
         X_w, Y_w, _ = augmenter.sample(X_t, X_i, X_e, Y_i, Y_e)
         
@@ -214,8 +223,13 @@ def run_experiment():
         
         # Only add Matched Sample if it exists (i.e. not IPW or weighting method that returns None)
         if X_w is not None and Y_w is not None:
-            X_dict_final[f"Matched ({method_name})"] = X_w
-            Y_dict_final[f"Matched ({method_name})"] = Y_w
+            X_matched = X_w
+            Y_matched = Y_w
+            # remove RCT control from matched if present
+            X_matched = X_matched[~np.isin(X_matched, X_i).all(axis=1)]
+            Y_matched = Y_matched[~np.isin(X_w, X_i).all(axis=1)]
+            X_dict_final[f"Matched ({method_name})"] = X_matched
+            Y_dict_final[f"Matched ({method_name})"] = Y_matched
         
         # Save in method specific folder
         plot_covariate_densities(X_dict_final, DIM, output_dir=f"plots/{method_name}")

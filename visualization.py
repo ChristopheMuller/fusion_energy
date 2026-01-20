@@ -95,6 +95,7 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
         plt.scatter(X_pca[:, 0], X_pca[:, 1], label=label, **style)
 
     # Plot matched overlay
+    n_matched = 0
     for label in matched_keys:
         X = data_dict[label]
         if X.shape[0] == 0:
@@ -103,7 +104,11 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
         style = get_style(label)
         plt.scatter(X_pca[:, 0], X_pca[:, 1], label=label, **style)
 
-    plt.title("Covariate Scatter (PC1 vs PC2)")
+        if "Matched" in label:
+            n_matched = X.shape[0]
+
+
+    plt.title(f"Covariate Scatter (PC1 vs PC2, n={n_matched})")
     plt.xlabel(f"PC1 ({pca.explained_variance_ratio_[0]:.1%} var)")
     plt.ylabel(f"PC2 ({pca.explained_variance_ratio_[1]:.1%} var)")
     plt.legend()
