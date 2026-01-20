@@ -11,7 +11,13 @@ def generate_outcomes_nonlinear(X, treatment_effect, beta=None):
     if beta is None:
         beta = np.random.uniform(-2, 2, size=d)
     y0 = X @ beta + np.random.normal(0, 0.5, n)
-    y1 = y0 + treatment_effect
+    
+    if callable(treatment_effect):
+        effect = treatment_effect(X)
+    else:
+        effect = treatment_effect
+        
+    y1 = y0 + effect
 
     # y0 = np.zeros(n)
     # if d >= 1:

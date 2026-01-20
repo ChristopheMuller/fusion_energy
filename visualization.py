@@ -117,6 +117,24 @@ def plot_covariate_2d_scatter(data_dict, output_dir="plots"):
     plt.close()
     print(f"PCA scatter plot saved to {output_dir}/")
 
+def plot_treatment_effect_heterogeneity(X, true_tau_values, output_dir="plots"):
+    tau_dir = os.path.join(output_dir, "tau")
+    if not os.path.exists(tau_dir):
+        os.makedirs(tau_dir)
+    
+    dim = X.shape[1]
+    for d in range(dim):
+        plt.figure(figsize=(10, 6))
+        plt.scatter(X[:, d], true_tau_values, alpha=0.5, c='purple')
+        plt.title(f"Heterogeneity of Treatment Effect (vs Covariate {d+1})")
+        plt.xlabel(f"Covariate {d+1}")
+        plt.ylabel("True Treatment Effect (Tau)")
+        plt.grid(True, alpha=0.3)
+        plt.savefig(f"{tau_dir}/tau_heterogeneity_cov_{d+1}.png")
+        plt.close()
+    
+    print(f"Tau heterogeneity plots saved to {tau_dir}/")
+
 def plot_bias_variance_comparison(results_dict, output_dir="plots"):
     """
     Plots Bias and Variance evolution for multiple strategies.

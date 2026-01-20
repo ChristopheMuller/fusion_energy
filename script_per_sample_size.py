@@ -11,7 +11,8 @@ from visualization import (
     plot_outcome_densities,
     plot_covariate_2d_scatter,
     plot_error_boxplot,
-    plot_energy_mse_method_decomposition
+    plot_energy_mse_method_decomposition,
+    plot_treatment_effect_heterogeneity
 )
 
 # --- Global Configuration ---
@@ -21,6 +22,14 @@ METHODS_CONFIG = {
     "IPW": (IPWAugmenter, {}),
     "En.Weighting": (EnergyAugmenter_Weighting, {})
 }
+
+def tau_fn(X):
+    """
+    Heterogeneous Treatment Effect:
+    2.5 if X[0] < 0
+    1.5 if X[0] >= 0
+    """
+    return np.where(X[:, 0] < 0, 2.5, 1.5)
 
 def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var, tau):
     """
@@ -87,7 +96,7 @@ def run_experiment():
     RCT_VAR = 1.0
     EXT_VAR = 1.5
 
-    TAU = 2.5
+    TAU = tau_fn
 
     # Restoring full experiment settings
     N_SAMPLED_LIST = [0, 5, 10, 20, 30, 50, 75, 100, 150]
@@ -197,6 +206,12 @@ def run_experiment():
     data = create_complex_dataset(N_TREAT, N_CTRL_RCT, N_EXT_POOL, DIM, TAU, rct_bias=RCT_BIAS, ext_bias=EXT_BIAS, rct_var=RCT_VAR, ext_var=EXT_VAR)
     
     X_t = data["target"]["X"]
+    
+    if callable(TAU):
+        print("Plotting treatment effect heterogeneity...")
+        tau_vals = TAU(X_t)
+        plot_treatment_effect_heterogeneity(X_t, tau_vals, output_dir="plots")
+
     Y_t = data["target"]["Y"]
     X_i = data["internal"]["X"]
     Y_i = data["internal"]["Y"]
