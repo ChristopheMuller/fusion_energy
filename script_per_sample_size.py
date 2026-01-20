@@ -3,7 +3,7 @@ from joblib import Parallel, delayed
 from collections import defaultdict
 from data_gen import create_complex_dataset
 from methods import EnergyAugmenter_Matching, EnergyAugmenter_PooledTarget, EnergyAugmenter_MatchingReg, IPWAugmenter, EnergyAugmenter_Weighting
-from utils import compute_energy_distance_numpy
+from utils import compute_energy_distance_numpy, compute_weighted_energy_distance
 from visualization import (
     plot_bias_variance_comparison,
     plot_energy_comparison,
@@ -24,8 +24,7 @@ METHODS_CONFIG = {
 }
 
 def tau_fn(X):
-    X1_stand = (X[:, 0] - np.mean(X[:, 0])) / np.std(X[:, 0])
-    return 1+0.5 * X1_stand
+    return np.ones(X.shape[0]) *  1.5
 
 def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_bias, ext_bias, rct_var, ext_var, tau):
     """
@@ -63,8 +62,10 @@ def process_repetition(rep_id, n_sampled_list, n_treat, n_ctrl, n_ext, dim, rct_
             mu_control_weighted = np.sum(weights * Y_control_full)
             
             att_w = np.mean(Y_t) - mu_control_weighted
-            # Handle Energy Calculation (might be None for IPW)
-            en_w, d12, d11, d22 = compute_energy_distance_numpy(X_w, X_t)
+            
+            # Unify Energy Calculation:
+            X_control_full = np.vstack([X_i, X_e])
+            en_w, d12, d11, d22 = compute_weighted_energy_distance(X_control_full, X_t, weights)
             
             rep_results.append({
                 'method': method_name,
@@ -85,18 +86,18 @@ def run_experiment():
     N_CTRL_RCT = 100
     N_EXT_POOL = 1000
 
-    DIM = 2
+    DIM = 3
     
     RCT_BIAS = 0.
     EXT_BIAS = 1.
     RCT_VAR = 1.0
-    EXT_VAR = 1.5
+    EXT_VAR = 2.0
 
     TAU = tau_fn
 
     # Restoring full experiment settings
     N_SAMPLED_LIST = [0, 5, 10, 20, 30, 50, 75, 100, 150]
-    K_REP = 100
+    K_REP = 150
         
     print(f"Experimental Setup: N_SAMPLED={N_SAMPLED_LIST}")
     print(f"Repetitions: {K_REP}")
