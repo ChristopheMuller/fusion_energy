@@ -4,6 +4,20 @@ import torch
 import torch.nn.functional as F
 from structures import PotentialOutcomes, SplitData
 
+"""
+Design Strategies for Splitting RCT and External Data Pools.
+
+Previous steps generated (pooled) RCT data with potential outcomes, and external data with only control outcomes.
+
+Here, the simulation proceeds as follows:
+- Use a Design strategy to split the RCT data into treatment and internal control groups,
+  and (potentially) determine how many external units to augment with (as the split may depend on this).
+- Return a SplitData object containing all necessary subsets for estimation.
+- Note: this step does NOT observe outcomes for RCT units as one does not yet know which units are treated vs control.
+
+Next steps will involve applying Estimators on the SplitData to estimate treatment effects.
+"""
+
 class BaseDesign(ABC):
     @abstractmethod
     def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes) -> SplitData:

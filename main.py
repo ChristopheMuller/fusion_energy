@@ -23,6 +23,33 @@ N_RCT = 500
 N_EXT = 1000
 # -------------------------
 
+
+# ----- PIPELINES ------
+@dataclass
+class MethodPipeline:
+    name: str
+    design: Any 
+    estimator: Any
+
+PIPELINES = [
+        MethodPipeline(
+            name="NoAug_InternalOnly",
+            design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=0),
+            estimator=IPWEstimator()
+        ),
+        MethodPipeline(
+            name="Fixed_EnergyMatch",
+            design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=100),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="OptimalN_IPW",
+            design=EnergyOptimizedDesign(n_min=50, n_max=500, k_folds=3, n_iter=200),
+            estimator=IPWEstimator()
+        )
+    ]
+# ----------------------
+
 @dataclass
 class SimLog:
     """Stores bias from each simulation run"""
@@ -42,12 +69,6 @@ class SimLog:
             "Variance": variance,
             "Check (Bias^2+Var)": bias**2 + variance
         }
-
-@dataclass
-class MethodPipeline:
-    name: str
-    design: Any 
-    estimator: Any
 
 def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, pipelines):
     """Runs a single iteration of the simulation."""
@@ -75,27 +96,8 @@ def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_
 def run_monte_carlo(n_sims=100):
 
     beta_fixed = np.ones(DIM)
-    
-    # Define the pipelines here
-    pipelines = [
-        MethodPipeline(
-            name="NoAug_InternalOnly",
-            design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=0),
-            estimator=IPWEstimator()
-        ),
-        MethodPipeline(
-            name="Fixed_EnergyMatch",
-            design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=100),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="OptimalN_IPW",
-            design=EnergyOptimizedDesign(n_min=50, n_max=500, k_folds=3, n_iter=200),
-            estimator=IPWEstimator()
-        )
-    ]
-    
-    logs = {p.name: SimLog() for p in pipelines}
+        
+    logs = {p.name: SimLog() for p in PIPELINES}
 
     print(f"Starting simulation with {n_sims} iterations (Parallel)...")
 
@@ -114,7 +116,7 @@ def run_monte_carlo(n_sims=100):
             var_ext=VAR_EXT,
             bias_ext=BIAS_EXT,
             beta_bias_ext=BETA_BIAS_EXT,
-            pipelines=pipelines
+            pipelines=PIPELINES
         ) for seed in seeds
     )
 

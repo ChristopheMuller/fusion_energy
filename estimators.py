@@ -5,6 +5,26 @@ import torch.nn.functional as F
 from structures import SplitData, EstimationResult
 from sklearn.linear_model import LogisticRegression
 
+"""
+Estimator classes for treatment effect estimation.
+
+Previous steps include:
+1. Data generation of (pooled) RCT data and external (control) data.
+2. RCT splitting into treated and internal control groups.
+
+This module takes the split data and applies different estimation strategies:
+*WEIGHTNG*
+- IPWEstimator: Inverse Probability Weighting to reweight external controls.
+- EnergyWeigthingEstimator: ...
+
+*MATCHING*
+- EnergyMatchingEstimator: Uses energy distance to select external controls.
+
+*DUMMY*
+- ...
+
+"""
+
 class BaseEstimator(ABC):
     @abstractmethod
     def estimate(self, data: SplitData) -> EstimationResult:
