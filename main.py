@@ -9,8 +9,10 @@ from dataclasses import dataclass, field
 from typing import List, Any
 
 
+from visualisations import plot_error_boxplots
+
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 100
+N_SIMS = 50
 DIM = 2
 
 MEAN_RCT = np.ones(DIM)
@@ -20,7 +22,7 @@ VAR_EXT = 1.5
 BIAS_EXT = 1.5
 BETA_BIAS_EXT = 0.0
 
-N_RCT = 100
+N_RCT = 200
 N_EXT = 500
 # -------------------------
 
@@ -179,6 +181,9 @@ def run_monte_carlo(n_sims=100):
     df_results = pd.DataFrame(results).sort_values("MSE")
     cols = ["Method", "MSE", "Bias^2", "Variance", "Avg N_Ext", "Avg Sum W_Ext"]
     print(df_results[cols].to_string(index=False, float_format="%.3f"))
+
+    # Visualisations of results
+    plot_error_boxplots(logs)
 
 if __name__ == "__main__":
     run_monte_carlo(n_sims=N_SIMS)
