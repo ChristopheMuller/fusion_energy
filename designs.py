@@ -113,14 +113,10 @@ class EnergyOptimizedDesign(BaseDesign):
         n_c = X_c.shape[0]
         n_t = X_t.shape[0]
         
-        # Proxy n for optimization (e.g., middle of search range)
-        # This helps set the 'beta' balance parameter for the loss function
         proxy_n = (self.n_min + min(self.n_max, n_e)) // 2
         total_n = n_c + proxy_n
         beta = proxy_n / total_n  # Weight of External relative to Internal
 
-        # Precompute Distance Matrices (The Heavy Lifting)
-        # We need: D_et (External-Target), D_ie (Internal-External), D_ee (External-External)
         d_et = torch.cdist(X_e, X_t)
         d_et_sum = d_et.sum(dim=1) # Sum over Target
         
@@ -137,22 +133,12 @@ class EnergyOptimizedDesign(BaseDesign):
             opt.zero_grad()
             w = F.softmax(logits, dim=0)
             
-            # Energy Distance Terms
-            # 1. Cross Term: (Pooled vs Target)
-            # Contribution from External: w * sum(d_et)
             term1_ext = torch.dot(w, d_et_sum) / n_t
-            # (Note: Internal-Target term is constant wrt w, so ignored in grad)
             
             # 2. Self Term: (Pooled vs Pooled)
-            # Part A: External vs External -> w^T * D_ee * w
             term2_ee = torch.dot(w, torch.mv(d_ee, w))
-            
-            # Part B: Internal vs External -> w * sum(d_ie)
             term2_ie = torch.dot(w, d_ie_sum) / n_c
             
-            # Weighted Energy Objective
-            # Energy = 2 * E[XY] - E[XX] - E[YY]
-            # We only care about terms involving w
             loss = (2 * beta * term1_ext) - (beta**2 * term2_ee + 2 * (1 - beta) * beta * term2_ie)
             
             loss.backward()
@@ -193,50 +179,24 @@ class EnergyOptimizedDesign(BaseDesign):
         X_aug = X_e[batch_idx] 
         
         # 3. Compute Energy Efficiently (Batch Mode)
-        
-        # Term 1: Pooled vs Target (Cross)
-        # Pooled = [X_c (fixed), X_aug (variable)]
-        # E[d(P, T)] = (Sum d(X_c, T) + Sum d(X_aug, T)) / (N_pool * N_t)
-        
-        # We pre-calculate d(X_c, T) sum outside if we want ultimate speed, 
-        # but here we just compute on fly for clarity.
-        
-        # X_c_expanded: (1, n_c, dim) -> broadcast to (k_best, n_c, dim) is implicit in cdist? No.
-        # Let's compute components.
-        
-        # A. Constant Part (Internal vs Target)
-        # dist_ct_const = torch.cdist(X_c, X_t).sum() # Scalar
-        
-        # B. Variable Part (Augmented vs Target)
-        # dist_aug_t: (k_best, n, n_t)
+
         X_t_expanded = X_t.unsqueeze(0) # (1, n_t, dim)
         dist_aug_t = torch.cdist(X_aug, X_t_expanded) 
         sum_aug_t = dist_aug_t.sum(dim=(1, 2)) # (k_best,)
         
-        # Term 2: Pooled vs Pooled (Self)
-        # E[d(P, P)] = (Sum d(C, C) + Sum d(A, A) + 2 Sum d(C, A)) / N_pool^2
-        
-        # A. Aug vs Aug
         dist_aa = torch.cdist(X_aug, X_aug)
         sum_aa = dist_aa.sum(dim=(1, 2)) # (k_best,)
         
-        # B. Internal vs Aug
         X_c_expanded = X_c.unsqueeze(0) # (1, n_c, dim)
         dist_ca = torch.cdist(X_c_expanded, X_aug) # (k_best, n_c, n)
         sum_ca = dist_ca.sum(dim=(1, 2)) # (k_best,)
-        
-        # Calculate Metric (Energy Proxy)
-        # We can drop constants (like d(C,C) and d(C,T)) if we only care about minimization,
-        # BUT n changes, so the denominator (N_pool) changes. We must include constants.
         
         sum_ct = torch.cdist(X_c, X_t).sum()
         sum_cc = torch.cdist(X_c, X_c).sum()
         
         term_cross = (sum_ct + sum_aug_t) / (n_pool * n_t)
         term_self = (sum_cc + sum_aa + 2 * sum_ca) / (n_pool**2)
-        
-        # Energy = 2 * Cross - Self - (Target-Target constant)
-        # We ignore Target-Target constant as it doesn't affect min
+
         energy = 2 * term_cross - term_self
         
         return torch.min(energy).item()
@@ -290,6 +250,181 @@ class EnergyOptimizedDesign(BaseDesign):
             n_treat = int((n_rct) * self.ratio_trt_before_augmentation)
         else:
             n_treat = int((n_rct + best_n_aug) * self.ratio_trt_after_augmentation)
+        
+        indices = np.random.permutation(n_rct)
+        idx_t = indices[:n_treat]
+        idx_c = indices[n_treat:]
+        
+        true_sate = np.mean(rct_pool.Y1[indices] - rct_pool.Y0[indices])
+
+        return SplitData(
+            X_treat=rct_pool.X[idx_t],
+            Y_treat=rct_pool.Y1[idx_t],
+            X_control_int=rct_pool.X[idx_c],
+            Y_control_int=rct_pool.Y0[idx_c],
+            X_external=ext_pool.X,
+            Y_external=ext_pool.Y0,
+            true_sate=true_sate,
+            target_n_aug=best_n_aug
+        )
+
+class PooledEnergyMinimizer(BaseDesign):
+    """
+    For n = 0, ..., N_ext, finds the n that minimizes Energy distance between:
+    - Pooled RCT (Treatment + Control)
+    - Best matching population from External data of size n.
+
+    Once n* optimal is found, splits RCT into treatment/control to balance effective sample sizes.
+    """
+    def __init__(self, 
+                 k_best=50, 
+                 n_min=10, 
+                 n_max=500, 
+                 lr=0.05, 
+                 n_iter=500,
+                 device=None):
+        self.k_best = k_best
+        self.n_min = n_min
+        self.n_max = n_max
+        self.lr = lr
+        self.n_iter = n_iter
+        
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = device
+
+    def _optimize_soft_weights(self, X_pool, X_ext):
+        """
+        Learns soft weights for X_ext that make it match X_pool.
+        Reference: EnergyAugmenter_PooledTarget.fit
+        """
+        X_pool_torch = torch.tensor(X_pool, dtype=torch.float32, device=self.device)
+        X_e_torch = torch.tensor(X_ext, dtype=torch.float32, device=self.device)
+        
+        n_e = X_e_torch.shape[0]
+        
+        # Precompute Distances
+        # d_ep: (n_ext, n_pool) -> Distance from each external unit to all RCT units
+        d_ep = torch.cdist(X_e_torch, X_pool_torch)
+        d_ep_mean = d_ep.mean(dim=1) # (n_ext,)
+        
+        # d_ee: (n_ext, n_ext)
+        d_ee = torch.cdist(X_e_torch, X_e_torch)
+        
+        logits = torch.zeros(n_e, requires_grad=True, device=self.device)
+        opt = torch.optim.Adam([logits], lr=self.lr)
+        
+        for _ in range(self.n_iter):
+            opt.zero_grad()
+            w = F.softmax(logits, dim=0)
+            
+            # Energy Distance Objectives
+            # Term 1: 2 * E[d(Ext_w, Pool)]
+            term1 = 2 * torch.dot(w, d_ep_mean)
+            
+            # Term 2: E[d(Ext_w, Ext_w)]
+            term2 = torch.dot(w, torch.mv(d_ee, w))
+            
+            # Minimize Energy = Term1 - Term2
+            loss = term1 - term2
+            loss.backward()
+            opt.step()
+            
+        return logits.detach()
+
+    def _evaluate_n_energy(self, n, logits, X_pool, X_ext):
+        """
+        Samples subsets of size n based on logits and returns the best Energy Distance found.
+        Reference: EnergyAugmenter_PooledTarget.sample
+        """
+        if n == 0: return 9999.0
+        
+        X_pool_torch = torch.tensor(X_pool, dtype=torch.float32, device=self.device)
+        X_ext_torch = torch.tensor(X_ext, dtype=torch.float32, device=self.device)
+        
+        # 1. Sample Indices
+        probs = F.softmax(logits, dim=0)
+        probs_np = probs.cpu().numpy()
+        probs_np /= probs_np.sum()
+        pool_idx = np.arange(len(probs_np))
+        
+        batch_indices_list = [
+            np.random.choice(pool_idx, size=n, replace=False, p=probs_np)
+            for _ in range(self.k_best)
+        ]
+        
+        # (k_best, n)
+        batch_idx = torch.tensor(np.array(batch_indices_list), device=self.device, dtype=torch.long)
+        
+        # 2. Gather Candidates: (k_best, n, dim)
+        X_cand_ext = X_ext_torch[batch_idx]
+        
+        # 3. Compute Energy
+        # Term 1: 2 * E[d(Subset, Pool)]
+        X_pool_expanded = X_pool_torch.unsqueeze(0) # (1, n_pool, dim)
+        d_cp = torch.cdist(X_cand_ext, X_pool_expanded) # (k_best, n, n_pool)
+        term1 = 2 * d_cp.mean(dim=(1, 2)) # (k_best,)
+        
+        # Term 2: E[d(Subset, Subset)]
+        d_cc = torch.cdist(X_cand_ext, X_cand_ext) # (k_best, n, n)
+        term2 = d_cc.mean(dim=(1, 2)) # (k_best,)
+        
+        # Note: We ignore E[d(Pool, Pool)] as it is constant across all n
+        scores = term1 - term2
+        
+        return torch.min(scores).item()
+
+    def _search_best_n(self, X_pool, X_ext, logits):
+        """
+        Searches for n that minimizes the Energy distance.
+        Uses Ternary Search assuming convexity of the Energy profile.
+        """
+        left = self.n_min
+        right = min(self.n_max, X_ext.shape[0])
+        
+        cache = {}
+        
+        def get_score(n):
+            if n in cache: return cache[n]
+            val = self._evaluate_n_energy(n, logits, X_pool, X_ext)
+            cache[n] = val
+            return val
+        
+        # Ternary Search
+        while right - left > 2:
+            m1 = left + (right - left) // 3
+            m2 = right - (right - left) // 3
+            
+            e1 = get_score(m1)
+            e2 = get_score(m2)
+            
+            if e1 < e2:
+                right = m2
+            else:
+                left = m1
+                
+        # Final fine-grained check
+        candidates = range(left, right + 1)
+        scores = [get_score(n) for n in candidates]
+        best_idx = np.argmin(scores)
+        
+        return candidates[best_idx]
+
+    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes) -> SplitData:
+        n_rct = rct_pool.X.shape[0]
+        
+        # 1. Optimize Weights (Gradient Descent)
+        # We compare the Entire RCT (Pooled) vs External
+        logits = self._optimize_soft_weights(rct_pool.X, ext_pool.X)
+        
+        # 2. Find Optimal N (Sampling)
+        best_n_aug = self._search_best_n(rct_pool.X, ext_pool.X, logits)
+        
+        # 3. Perform Design Split
+        # Balancing Effective Sample Size: N_treat = (N_rct + N_aug) / 2
+        n_treat = int((n_rct + best_n_aug) / 2)
+        n_treat = min(max(n_treat, 10), n_rct - 10) # Safety bounds
         
         indices = np.random.permutation(n_rct)
         idx_t = indices[:n_treat]

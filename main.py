@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from generators import DataGenerator
-from designs import FixedRatioDesign, EnergyOptimizedDesign
+from designs import FixedRatioDesign, EnergyOptimizedDesign, PooledEnergyMinimizer
 from estimators import IPWEstimator, EnergyMatchingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
@@ -46,6 +46,11 @@ PIPELINES = [
             name="OptimalN_IPW",
             design=EnergyOptimizedDesign(n_min=50, n_max=500, k_folds=3, n_iter=200),
             estimator=IPWEstimator()
+        ),
+        MethodPipeline(
+            name="Pooled_EnergyMatch",
+            design=PooledEnergyMinimizer(n_min=10, n_max=500, n_iter=200),
+            estimator=EnergyMatchingEstimator()
         )
     ]
 # ----------------------
