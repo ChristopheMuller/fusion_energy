@@ -11,9 +11,8 @@ from typing import List, Any
 
 # ----- GLOBAL CONFIG ----- 
 N_SIMS = 100
-DIM = 3
+DIM = 1
 
-EFFECT_SIZE = 2.0
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
 
@@ -24,6 +23,13 @@ BETA_BIAS_EXT = 0.0
 N_RCT = 50
 N_EXT = 1000
 # -------------------------
+
+# ----- CATE FUN -----
+def cate_function(X):
+    """Defines the Treatment Effect as a function of covariates X."""
+    return np.where(X[:,0] < np.median(X[:,0]), 3.0, 1.0)
+TREATMENT_EFFECT = cate_function
+# --------------------
 
 
 # ----- PIPELINES ------
@@ -125,7 +131,7 @@ class SimLog:
             "Check (Bias^2+Var)": bias**2 + variance
         }
 
-def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, effect_size, pipelines):
+def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, treatment_effect, pipelines):
     """Runs a single iteration of the simulation."""
     # Ensure independent randomness per process
     rng = np.random.default_rng(seed)
@@ -134,7 +140,7 @@ def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_
     gen = DataGenerator(dim=dim, beta=beta)
     
     # 1. Generate Data
-    rct_data = gen.generate_rct_pool(n=n_rct, mean=mean_rct, var=var_rct, effect_size=effect_size)
+    rct_data = gen.generate_rct_pool(n=n_rct, mean=mean_rct, var=var_rct, treatment_effect=treatment_effect)
     ext_data = gen.generate_external_pool(n=n_ext, mean=mean_rct-bias_ext, var=var_ext, beta_bias=beta_bias_ext)
 
     results = {}
@@ -171,7 +177,7 @@ def run_monte_carlo(n_sims=100):
             var_ext=VAR_EXT,
             bias_ext=BIAS_EXT,
             beta_bias_ext=BETA_BIAS_EXT,
-            effect_size=EFFECT_SIZE,
+            treatment_effect=TREATMENT_EFFECT,
             pipelines=PIPELINES
         ) for seed in seeds
     )
