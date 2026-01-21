@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from structures import PotentialOutcomes, SplitData
+from metrics import optimize_soft_weights, compute_batch_energy
 
 """
 Design Strategies for Splitting RCT and External Data Pools.
@@ -110,41 +111,16 @@ class EnergyOptimizedDesign(BaseDesign):
         that minimizes Energy(Pooled, Target).
         """
         n_e = X_e.shape[0]
-        n_c = X_c.shape[0]
-        n_t = X_t.shape[0]
-        
         proxy_n = (self.n_min + min(self.n_max, n_e)) // 2
-        total_n = n_c + proxy_n
-        beta = proxy_n / total_n  # Weight of External relative to Internal
-
-        d_et = torch.cdist(X_e, X_t)
-        d_et_sum = d_et.sum(dim=1) # Sum over Target
         
-        d_ie = torch.cdist(X_c, X_e)
-        d_ie_sum = d_ie.sum(dim=0) # Sum over Internal
-        
-        d_ee = torch.cdist(X_e, X_e)
-
-        # Optimization
-        logits = torch.zeros(n_e, requires_grad=True, device=self.device)
-        opt = torch.optim.Adam([logits], lr=self.lr)
-        
-        for _ in range(self.n_iter):
-            opt.zero_grad()
-            w = F.softmax(logits, dim=0)
-            
-            term1_ext = torch.dot(w, d_et_sum) / n_t
-            
-            # 2. Self Term: (Pooled vs Pooled)
-            term2_ee = torch.dot(w, torch.mv(d_ee, w))
-            term2_ie = torch.dot(w, d_ie_sum) / n_c
-            
-            loss = (2 * beta * term1_ext) - (beta**2 * term2_ee + 2 * (1 - beta) * beta * term2_ie)
-            
-            loss.backward()
-            opt.step()
-            
-        return logits.detach()
+        return optimize_soft_weights(
+            X_source=X_e,
+            X_target=X_t,
+            X_internal=X_c,
+            target_n_aug=proxy_n,
+            lr=self.lr,
+            n_iter=self.n_iter
+        )
 
     def _evaluate_n_energy(self, n, logits, X_t, X_c, X_e):
         """
@@ -153,10 +129,6 @@ class EnergyOptimizedDesign(BaseDesign):
         returns the minimum energy found.
         """
         if n == 0: return 9999.0 # Edge case
-        
-        n_c = X_c.shape[0]
-        n_t = X_t.shape[0]
-        n_pool = n_c + n
         
         # 1. Sample Indices
         probs = F.softmax(logits, dim=0)
@@ -179,27 +151,9 @@ class EnergyOptimizedDesign(BaseDesign):
         X_aug = X_e[batch_idx] 
         
         # 3. Compute Energy Efficiently (Batch Mode)
-
-        X_t_expanded = X_t.unsqueeze(0) # (1, n_t, dim)
-        dist_aug_t = torch.cdist(X_aug, X_t_expanded) 
-        sum_aug_t = dist_aug_t.sum(dim=(1, 2)) # (k_best,)
+        energies = compute_batch_energy(X_aug, X_t, X_c)
         
-        dist_aa = torch.cdist(X_aug, X_aug)
-        sum_aa = dist_aa.sum(dim=(1, 2)) # (k_best,)
-        
-        X_c_expanded = X_c.unsqueeze(0) # (1, n_c, dim)
-        dist_ca = torch.cdist(X_c_expanded, X_aug) # (k_best, n_c, n)
-        sum_ca = dist_ca.sum(dim=(1, 2)) # (k_best,)
-        
-        sum_ct = torch.cdist(X_c, X_t).sum()
-        sum_cc = torch.cdist(X_c, X_c).sum()
-        
-        term_cross = (sum_ct + sum_aug_t) / (n_pool * n_t)
-        term_self = (sum_cc + sum_aa + 2 * sum_ca) / (n_pool**2)
-
-        energy = 2 * term_cross - term_self
-        
-        return torch.min(energy).item()
+        return torch.min(energies).item()
 
     def _search_best_n(self, X_t, X_c, X_e, logits):
         """
@@ -302,36 +256,14 @@ class PooledEnergyMinimizer(BaseDesign):
         X_pool_torch = torch.tensor(X_pool, dtype=torch.float32, device=self.device)
         X_e_torch = torch.tensor(X_ext, dtype=torch.float32, device=self.device)
         
-        n_e = X_e_torch.shape[0]
-        
-        # Precompute Distances
-        # d_ep: (n_ext, n_pool) -> Distance from each external unit to all RCT units
-        d_ep = torch.cdist(X_e_torch, X_pool_torch)
-        d_ep_mean = d_ep.mean(dim=1) # (n_ext,)
-        
-        # d_ee: (n_ext, n_ext)
-        d_ee = torch.cdist(X_e_torch, X_e_torch)
-        
-        logits = torch.zeros(n_e, requires_grad=True, device=self.device)
-        opt = torch.optim.Adam([logits], lr=self.lr)
-        
-        for _ in range(self.n_iter):
-            opt.zero_grad()
-            w = F.softmax(logits, dim=0)
-            
-            # Energy Distance Objectives
-            # Term 1: 2 * E[d(Ext_w, Pool)]
-            term1 = 2 * torch.dot(w, d_ep_mean)
-            
-            # Term 2: E[d(Ext_w, Ext_w)]
-            term2 = torch.dot(w, torch.mv(d_ee, w))
-            
-            # Minimize Energy = Term1 - Term2
-            loss = term1 - term2
-            loss.backward()
-            opt.step()
-            
-        return logits.detach()
+        return optimize_soft_weights(
+            X_source=X_e_torch,
+            X_target=X_pool_torch,
+            X_internal=None, # Pure matching
+            target_n_aug=None,
+            lr=self.lr,
+            n_iter=self.n_iter
+        )
 
     def _evaluate_n_energy(self, n, logits, X_pool, X_ext):
         """
@@ -361,19 +293,9 @@ class PooledEnergyMinimizer(BaseDesign):
         X_cand_ext = X_ext_torch[batch_idx]
         
         # 3. Compute Energy
-        # Term 1: 2 * E[d(Subset, Pool)]
-        X_pool_expanded = X_pool_torch.unsqueeze(0) # (1, n_pool, dim)
-        d_cp = torch.cdist(X_cand_ext, X_pool_expanded) # (k_best, n, n_pool)
-        term1 = 2 * d_cp.mean(dim=(1, 2)) # (k_best,)
+        energies = compute_batch_energy(X_cand_ext, X_pool_torch, X_internal=None)
         
-        # Term 2: E[d(Subset, Subset)]
-        d_cc = torch.cdist(X_cand_ext, X_cand_ext) # (k_best, n, n)
-        term2 = d_cc.mean(dim=(1, 2)) # (k_best,)
-        
-        # Note: We ignore E[d(Pool, Pool)] as it is constant across all n
-        scores = term1 - term2
-        
-        return torch.min(scores).item()
+        return torch.min(energies).item()
 
     def _search_best_n(self, X_pool, X_ext, logits):
         """

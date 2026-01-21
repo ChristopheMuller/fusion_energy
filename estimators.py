@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 from structures import SplitData, EstimationResult
 from sklearn.linear_model import LogisticRegression
+from metrics import optimize_soft_weights
 
 """
 Estimator classes for treatment effect estimation.
@@ -90,34 +91,14 @@ class EnergyMatchingEstimator(BaseEstimator):
             self.device = device
 
     def _optimize_soft_weights(self, X_t, X_c, X_e, target_n_aug):
-        n_e, n_c, n_t = X_e.shape[0], X_c.shape[0], X_t.shape[0]
-
-        proxy_n = target_n_aug
-        total_n = n_c + proxy_n
-        beta = proxy_n / total_n if total_n > 0 else 0.5
-
-        d_et = torch.cdist(X_e, X_t)
-        d_et_sum = d_et.sum(dim=1)
-        d_ie = torch.cdist(X_c, X_e)
-        d_ie_sum = d_ie.sum(dim=0)
-        d_ee = torch.cdist(X_e, X_e)
-
-        logits = torch.zeros(n_e, requires_grad=True, device=self.device)
-        opt = torch.optim.Adam([logits], lr=self.lr)
-
-        for _ in range(self.n_iter):
-            opt.zero_grad()
-            w = F.softmax(logits, dim=0)
-            
-            term1_ext = torch.dot(w, d_et_sum) / n_t if n_t > 0 else 0
-            term2_ee = torch.dot(w, torch.mv(d_ee, w))
-            term2_ie = torch.dot(w, d_ie_sum) / n_c if n_c > 0 else 0
-            
-            loss = (2 * beta * term1_ext) - (beta**2 * term2_ee + 2 * (1 - beta) * beta * term2_ie)
-            loss.backward()
-            opt.step()
-            
-        return logits.detach()
+        return optimize_soft_weights(
+            X_source=X_e,
+            X_target=X_t,
+            X_internal=X_c,
+            target_n_aug=target_n_aug,
+            lr=self.lr,
+            n_iter=self.n_iter
+        )
 
     def estimate(self, data: SplitData) -> EstimationResult:
         n_int = data.X_control_int.shape[0]
