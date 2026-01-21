@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-def optimize_soft_weights(
+def optimise_soft_weights(
     X_source: torch.Tensor,
     X_target: torch.Tensor,
     X_internal: torch.Tensor = None,
@@ -10,7 +10,7 @@ def optimize_soft_weights(
     n_iter: int = 300
 ):
     """
-    Optimizes soft weights (logits) for X_source to minimize Energy Distance.
+    Optimises soft weights (logits) for X_source to minimize Energy Distance.
     
     Scenarios:
     1. Augmentation / Mixture (X_internal provided):
@@ -65,7 +65,7 @@ def optimize_soft_weights(
         n_internal = 0
         d_is_sum = None
         
-    # Optimization
+    # optimisation
     logits = torch.zeros(n_source, requires_grad=True, device=X_source.device)
     opt = torch.optim.Adam([logits], lr=lr)
     

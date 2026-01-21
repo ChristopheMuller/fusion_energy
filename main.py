@@ -3,8 +3,8 @@ import pandas as pd
 from joblib import Parallel, delayed
 from structures import EstimationResult
 from generators import DataGenerator
-from designs import FixedRatioDesign, EnergyOptimizedDesign, PooledEnergyMinimizer
-from estimators import IPWEstimator, EnergyMatchingEstimator
+from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer
+from estimator import IPWEstimator, EnergyMatchingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
@@ -54,14 +54,19 @@ PIPELINES = [
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="OptimalN_IPW",
-            design=EnergyOptimizedDesign(n_min=50, n_max=500, k_folds=3, n_iter=200),
-            estimator=IPWEstimator()
+            name="EnergyOpt_EnergyMatch",
+            design=EnergyOptimisedDesign(n_min=50, n_max=500, k_folds=3, n_iter=200),
+            estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
             name="Pooled_EnergyMatch",
             design=PooledEnergyMinimizer(n_min=10, n_max=500, n_iter=200),
             estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="FullExt_IPW",
+            design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=N_EXT),
+            estimator=IPWEstimator()
         )
     ]
 # ----------------------
@@ -90,7 +95,7 @@ class SimLog:
             "Bias^2": bias**2,
             "Variance": variance,
             "Avg N_Ext": avg_n_ext,
-            "Avg ESS": avg_ess,
+            "Avg ESS_Ext": avg_ess,
             "Check (Bias^2+Var)": bias**2 + variance
         }
 
@@ -128,7 +133,7 @@ def run_monte_carlo(n_sims=100):
     # Generate seeds for reproducibility
     seeds = np.random.randint(0, 1000000, size=n_sims)
 
-    parallel_results = Parallel(n_jobs=-1, verbose=5)(
+    parallel_results = Parallel(n_jobs=10, verbose=5)(
         delayed(run_single_simulation)(
             seed=seed,
             dim=DIM,
@@ -158,8 +163,8 @@ def run_monte_carlo(n_sims=100):
         results.append(metrics)
     
     df_results = pd.DataFrame(results).sort_values("MSE")
-    cols = ["Method", "MSE", "Bias^2", "Variance", "Avg N_Ext", "Avg ESS"]
-    print(df_results[cols].to_string(index=False))
+    cols = ["Method", "MSE", "Bias^2", "Variance", "Avg N_Ext", "Avg ESS_Ext"]
+    print(df_results[cols].to_string(index=False, float_format="%.3f"))
 
 if __name__ == "__main__":
     run_monte_carlo(n_sims=N_SIMS)

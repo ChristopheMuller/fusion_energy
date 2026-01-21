@@ -4,7 +4,7 @@ Owner: Christophe (PhD, Oxford)
 ## Overview
 We are developing a method to augment RCT control arms with external control data. 
 The core problem is distributional mismatch between external controls and the trial population.
-We solve this using Energy Statistics (Energy Distance) to optimize weights or select a representative sample.
+We solve this using Energy Statistics (Energy Distance) to optimise weights or select a representative sample.
 
 ## Mathematical Context
 - **Target Distribution (Q):** RCT Treatment arm.
