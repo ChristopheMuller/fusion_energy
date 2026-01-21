@@ -58,6 +58,7 @@ class EnergyOptimizedDesign(BaseDesign):
                  lr=0.05, 
                  n_iter=300,
                  ratio_trt_after_augmentation=0.5,
+                 ratio_trt_before_augmentation=None,
                  device=None):
         self.k_folds = k_folds
         self.k_best = k_best
@@ -66,6 +67,10 @@ class EnergyOptimizedDesign(BaseDesign):
         self.lr = lr
         self.n_iter = n_iter
         self.ratio_trt_after_augmentation = ratio_trt_after_augmentation
+        self.ratio_trt_before_augmentation = ratio_trt_before_augmentation
+
+        if self.ratio_trt_before_augmentation is not None and self.ratio_trt_after_augmentation is not None:
+            raise ValueError("Specify only one of ratio_trt_before_augmentation or ratio_trt_after_augmentation.")
         
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -281,7 +286,10 @@ class EnergyOptimizedDesign(BaseDesign):
         n_rct = rct_pool.X.shape[0]
         
         # Calculation: N_treat = (N_rct + N_aug) / 2
-        n_treat = int((n_rct + best_n_aug) * self.ratio_trt_after_augmentation)
+        if self.ratio_trt_before_augmentation is not None:
+            n_treat = int((n_rct) * self.ratio_trt_before_augmentation)
+        else:
+            n_treat = int((n_rct + best_n_aug) * self.ratio_trt_after_augmentation)
         
         indices = np.random.permutation(n_rct)
         idx_t = indices[:n_treat]

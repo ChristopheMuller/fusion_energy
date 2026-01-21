@@ -26,3 +26,6 @@ class EstimationResult:
     error: float
     weights_internal: np.ndarray
     weights_external: np.ndarray
+
+    def n_external_used(self) -> int:
+        return np.sum(self.weights_external > 0)
