@@ -6,6 +6,21 @@ from estimators import IPWEstimator, EnergyMatchingEstimator
 from dataclasses import dataclass, field
 from typing import List
 
+
+# --- GLOBAL CONFIG ---
+N_SIMS = 100
+DIM = 5
+
+MEAN_RCT = np.ones(DIM)
+VAR_RCT = 1.0
+
+VAR_EXT = 1.5
+BIAS_EXT = 1
+BETA_BIAS_EXT = 0.
+
+N_RCT = 500
+N_EXT = 1000
+
 @dataclass
 class SimLog:
     """Stores bias from each simulation run"""
@@ -28,7 +43,7 @@ class SimLog:
 
 def run_monte_carlo(n_sims=100):
 
-    gen = DataGenerator(dim=5, beta = np.ones(5))
+    gen = DataGenerator(dim=DIM, beta = np.ones(DIM))
     
     logs = {
         "NoAug_InternalOnly": SimLog(),
@@ -42,8 +57,8 @@ def run_monte_carlo(n_sims=100):
         if (i+1) % 10 == 0:
             print(f"  ... iter {i+1}/{n_sims}")
         # 1. Generate Data (New samples, same mechanism)
-        rct_data = gen.generate_rct_pool(n=500, mean=np.ones(5), var=1.0)
-        ext_data = gen.generate_external_pool(n=2000, mean=np.ones(5)*1.2, var=1.5, beta_bias=0.1)
+        rct_data = gen.generate_rct_pool(n=N_RCT, mean=MEAN_RCT, var=VAR_RCT)
+        ext_data = gen.generate_external_pool(n=N_EXT, mean=MEAN_RCT-BIAS_EXT, var=VAR_EXT, beta_bias=BETA_BIAS_EXT)
 
         # --- Method 0: No Augmentation (Internal Only) ---
         design_no_aug = FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=0)
@@ -89,4 +104,4 @@ def run_monte_carlo(n_sims=100):
     print(df_results[cols].to_string(index=False))
 
 if __name__ == "__main__":
-    run_monte_carlo(n_sims=10)
+    run_monte_carlo(n_sims=N_SIMS)
