@@ -21,6 +21,7 @@ VAR_RCT = 1.0
 VAR_EXT = 1.5
 BIAS_EXT = 1.5
 BETA_BIAS_EXT = 0.0
+CORR = 0.5
 
 N_RCT = 200
 N_EXT = 500
@@ -114,7 +115,7 @@ class SimLog:
             "Check (Bias^2+Var)": bias**2 + variance
         }
 
-def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, treatment_effect, pipelines):
+def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, corr, treatment_effect, pipelines):
     """Runs a single iteration of the simulation."""
     # Ensure independent randomness per process
     rng = np.random.default_rng(seed)
@@ -123,8 +124,8 @@ def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_
     gen = DataGenerator(dim=dim, beta=beta)
     
     # 1. Generate Data
-    rct_data = gen.generate_rct_pool(n=n_rct, mean=mean_rct, var=var_rct, treatment_effect=treatment_effect)
-    ext_data = gen.generate_external_pool(n=n_ext, mean=mean_rct-bias_ext, var=var_ext, beta_bias=beta_bias_ext)
+    rct_data = gen.generate_rct_pool(n=n_rct, mean=mean_rct, var=var_rct, corr=corr, treatment_effect=treatment_effect)
+    ext_data = gen.generate_external_pool(n=n_ext, mean=mean_rct-bias_ext, var=var_ext, corr=corr, beta_bias=beta_bias_ext)
 
     results = {}
     
@@ -160,6 +161,7 @@ def run_monte_carlo(n_sims=100):
             var_ext=VAR_EXT,
             bias_ext=BIAS_EXT,
             beta_bias_ext=BETA_BIAS_EXT,
+            corr=CORR,
             treatment_effect=TREATMENT_EFFECT,
             pipelines=PIPELINES
         ) for seed in seeds
@@ -193,8 +195,8 @@ def run_monte_carlo(n_sims=100):
     rng_plot = np.random.default_rng(42)
     gen = DataGenerator(dim=DIM, beta=beta_fixed)
     
-    rct_data_plot = gen.generate_rct_pool(n=N_RCT, mean=MEAN_RCT, var=VAR_RCT, treatment_effect=TREATMENT_EFFECT)
-    ext_data_plot = gen.generate_external_pool(n=N_EXT, mean=MEAN_RCT-BIAS_EXT, var=VAR_EXT, beta_bias=BETA_BIAS_EXT)
+    rct_data_plot = gen.generate_rct_pool(n=N_RCT, mean=MEAN_RCT, var=VAR_RCT, corr=CORR, treatment_effect=TREATMENT_EFFECT)
+    ext_data_plot = gen.generate_external_pool(n=N_EXT, mean=MEAN_RCT-BIAS_EXT, var=VAR_EXT, corr=CORR, beta_bias=BETA_BIAS_EXT)
     
     for pipe in PIPELINES:
         split_data = pipe.design.split(rct_data_plot, ext_data_plot)
