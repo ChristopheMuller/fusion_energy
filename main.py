@@ -33,12 +33,22 @@ class MethodPipeline:
 
 PIPELINES = [
         MethodPipeline(
-            name="NoAug_InternalOnly",
+            name="RCT_ONLY_05",
             design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=0),
             estimator=IPWEstimator()
         ),
         MethodPipeline(
-            name="Fixed_EnergyMatch",
+            name="RCT_ONLY_04",
+            design=FixedRatioDesign(treat_ratio=0.4, fixed_n_aug=0),
+            estimator=IPWEstimator()
+        ),
+        MethodPipeline(
+            name="RCT_ONLY_06",
+            design=FixedRatioDesign(treat_ratio=0.6, fixed_n_aug=0),
+            estimator=IPWEstimator()
+        ),
+        MethodPipeline(
+            name="Fixed_EnergyMatching",
             design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=100),
             estimator=EnergyMatchingEstimator()
         ),
