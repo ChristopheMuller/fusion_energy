@@ -45,6 +45,9 @@ class EnergyOptimisedDesign(BaseDesign):
         optimal_ns = []
         X_ext_torch = torch.tensor(X_ext, dtype=torch.float32, device=self.device)
         
+        # Precompute Source-Source distance (invariant across folds)
+        d_ss = torch.cdist(X_ext_torch, X_ext_torch)
+        
         for fold in range(self.k_folds):
             # 1. Split RCT 1:1 into "Simulated Target" and "Simulated Internal"
             indices = np.random.permutation(n_rct)
@@ -54,7 +57,7 @@ class EnergyOptimisedDesign(BaseDesign):
             X_c_sim = torch.tensor(X_rct[indices[n_treat_sim:]], dtype=torch.float32, device=self.device)
             
             # 2. Optimise Soft Weights (Gradient Descent)
-            logits = self._optimise_soft_weights(X_t_sim, X_c_sim, X_ext_torch)
+            logits = self._optimise_soft_weights(X_t_sim, X_c_sim, X_ext_torch, d_ss=d_ss)
             
             # 3. Find optimal n (Ternary Search)
             best_n_fold = self._search_best_n(X_t_sim, X_c_sim, X_ext_torch, logits)
@@ -62,7 +65,7 @@ class EnergyOptimisedDesign(BaseDesign):
 
         return int(np.mean(optimal_ns))
 
-    def _optimise_soft_weights(self, X_t, X_c, X_e):
+    def _optimise_soft_weights(self, X_t, X_c, X_e, d_ss=None):
         n_e = X_e.shape[0]
         # Use a proxy N (midpoint) to learn stable ranking
         proxy_n = (self.n_min + min(self.n_max, n_e)) // 2
@@ -73,7 +76,8 @@ class EnergyOptimisedDesign(BaseDesign):
             X_internal=X_c,
             target_n_aug=proxy_n,
             lr=self.lr,
-            n_iter=self.n_iter
+            n_iter=self.n_iter,
+            dist_ss=d_ss
         )
 
     def _evaluate_n_energy(self, n, logits, X_t, X_c, X_e):

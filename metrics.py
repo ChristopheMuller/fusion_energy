@@ -7,7 +7,10 @@ def optimise_soft_weights(
     X_internal: torch.Tensor = None,
     target_n_aug: int = None,
     lr: float = 0.05,
-    n_iter: int = 300
+    n_iter: int = 300,
+    dist_st: torch.Tensor = None,
+    dist_ss: torch.Tensor = None,
+    dist_is: torch.Tensor = None
 ):
     """
     Optimises soft weights (logits) for X_source to minimize Energy Distance.
@@ -32,6 +35,9 @@ def optimise_soft_weights(
         target_n_aug: int - Required if X_internal is present. The effective sample size of source.
         lr: Learning rate.
         n_iter: Number of iterations.
+        dist_st: Optional precomputed Source -> Target distance matrix.
+        dist_ss: Optional precomputed Source -> Source distance matrix.
+        dist_is: Optional precomputed Internal -> Source distance matrix.
         
     Returns:
         logits: Tensor (n_s,) - Unnormalized log-probabilities.
@@ -41,11 +47,17 @@ def optimise_soft_weights(
     
     # Precompute distances
     # d_st: Source -> Target
-    d_st = torch.cdist(X_source, X_target)
+    if dist_st is not None:
+        d_st = dist_st
+    else:
+        d_st = torch.cdist(X_source, X_target)
     d_st_sum = d_st.sum(dim=1) # (n_source,)
     
     # d_ss: Source -> Source
-    d_ss = torch.cdist(X_source, X_source)
+    if dist_ss is not None:
+        d_ss = dist_ss
+    else:
+        d_ss = torch.cdist(X_source, X_source)
     
     if X_internal is not None:
         if target_n_aug is None:
@@ -58,7 +70,10 @@ def optimise_soft_weights(
         beta = target_n_aug / total_n if total_n > 0 else 0.5
         
         # d_is: Internal -> Source
-        d_is = torch.cdist(X_internal, X_source)
+        if dist_is is not None:
+            d_is = dist_is
+        else:
+            d_is = torch.cdist(X_internal, X_source)
         d_is_sum = d_is.sum(dim=0) # (n_source,)
     else:
         beta = 1.0
@@ -69,6 +84,7 @@ def optimise_soft_weights(
     logits = torch.zeros(n_source, requires_grad=True, device=X_source.device)
     opt = torch.optim.Adam([logits], lr=lr)
     
+    prev_loss = float('inf')
     for _ in range(n_iter):
         opt.zero_grad()
         w = F.softmax(logits, dim=0)
@@ -94,6 +110,9 @@ def optimise_soft_weights(
             
         loss.backward()
         opt.step()
+        if abs(prev_loss - loss.item()) < 1e-6:
+            break
+        prev_loss = loss.item()
         
     return logits.detach()
 

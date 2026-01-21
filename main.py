@@ -11,7 +11,7 @@ from typing import List, Any
 
 # ----- GLOBAL CONFIG ----- 
 N_SIMS = 100
-DIM = 1
+DIM = 2
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
@@ -20,14 +20,15 @@ VAR_EXT = 1.5
 BIAS_EXT = 1.5
 BETA_BIAS_EXT = 0.0
 
-N_RCT = 50
-N_EXT = 1000
+N_RCT = 100
+N_EXT = 500
 # -------------------------
+
 
 # ----- CATE FUN -----
 def cate_function(X):
     """Defines the Treatment Effect as a function of covariates X."""
-    return np.where(X[:,0] < np.median(X[:,0]), 3.0, 1.0)
+    return 2.0 * np.ones(X.shape[0])
 TREATMENT_EFFECT = cate_function
 # --------------------
 
@@ -46,18 +47,8 @@ PIPELINES = [
             estimator=DummyMatchingEstimator()
         ),
         MethodPipeline(
-            name="IPW",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=0),
-            estimator=IPWEstimator()
-        ),
-        MethodPipeline(
             name="EnergyMatching_5",
             design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=5),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_10",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=10),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
@@ -66,18 +57,13 @@ PIPELINES = [
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="EnergyMatching_30",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=30),
+            name="EnergyMatching_50",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=50),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="EnergyMatching_25",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=25),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_15",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=15),
+            name="EnergyMatching_75",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=75),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
@@ -88,11 +74,6 @@ PIPELINES = [
         MethodPipeline(
             name="Energy_Matching_PooledEnergy",
             design=PooledEnergyMinimizer(),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="IPW_BalanceDesign_EnergyMatching",
-            design=IPWBalanceDesign(ratio_trt_after_augmentation=0.5),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
