@@ -4,7 +4,7 @@ from joblib import Parallel, delayed
 from structures import EstimationResult
 from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer
-from estimator import IPWEstimator, EnergyMatchingEstimator
+from estimator import IPWEstimator, EnergyMatchingEstimator, DummyMatchingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
@@ -36,17 +36,27 @@ PIPELINES = [
         MethodPipeline(
             name="RCT_ONLY_05",
             design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=0),
-            estimator=IPWEstimator()
+            estimator=DummyMatchingEstimator()
         ),
         MethodPipeline(
             name="RCT_ONLY_04",
             design=FixedRatioDesign(treat_ratio=0.4, target_n_aug=0),
-            estimator=IPWEstimator()
+            estimator=DummyMatchingEstimator()
         ),
         MethodPipeline(
             name="RCT_ONLY_06",
             design=FixedRatioDesign(treat_ratio=0.6, target_n_aug=0),
-            estimator=IPWEstimator()
+            estimator=DummyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="Dummy_AllExt",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=N_EXT),
+            estimator=DummyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="Dummy_random_10",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=10),
+            estimator=DummyMatchingEstimator()
         )
     ]
 # ----------------------
