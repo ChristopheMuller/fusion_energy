@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import List, Any
 
 
-from visualisations import plot_error_boxplots
+from visualisations import plot_error_boxplots, plot_pca_weights
 
 # ----- GLOBAL CONFIG ----- 
 N_SIMS = 50
@@ -184,6 +184,25 @@ def run_monte_carlo(n_sims=100):
 
     # Visualisations of results
     plot_error_boxplots(logs)
+
+    # Visualisations of example data
+    print("Generating PCA plots...")
+    
+    # Generate one example dataset (using a fixed seed for consistency in plots)
+    np.random.seed(42)
+    rng_plot = np.random.default_rng(42)
+    gen = DataGenerator(dim=DIM, beta=beta_fixed)
+    
+    rct_data_plot = gen.generate_rct_pool(n=N_RCT, mean=MEAN_RCT, var=VAR_RCT, treatment_effect=TREATMENT_EFFECT)
+    ext_data_plot = gen.generate_external_pool(n=N_EXT, mean=MEAN_RCT-BIAS_EXT, var=VAR_EXT, beta_bias=BETA_BIAS_EXT)
+    
+    for pipe in PIPELINES:
+        split_data = pipe.design.split(rct_data_plot, ext_data_plot)
+        est_result = pipe.estimator.estimate(split_data)
+        
+        plot_filename = f"plots/{pipe.name}/pca_weights.png"
+        plot_pca_weights(split_data, est_result, f"PCA Weights - {pipe.name}", plot_filename)
+
 
 if __name__ == "__main__":
     run_monte_carlo(n_sims=N_SIMS)
