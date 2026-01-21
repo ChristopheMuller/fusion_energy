@@ -35,37 +35,17 @@ class MethodPipeline:
 PIPELINES = [
         MethodPipeline(
             name="RCT_ONLY_05",
-            design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=0),
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=0),
             estimator=IPWEstimator()
         ),
         MethodPipeline(
             name="RCT_ONLY_04",
-            design=FixedRatioDesign(treat_ratio=0.4, fixed_n_aug=0),
+            design=FixedRatioDesign(treat_ratio=0.4, target_n_aug=0),
             estimator=IPWEstimator()
         ),
         MethodPipeline(
             name="RCT_ONLY_06",
-            design=FixedRatioDesign(treat_ratio=0.6, fixed_n_aug=0),
-            estimator=IPWEstimator()
-        ),
-        MethodPipeline(
-            name="Fixed_EnergyMatching",
-            design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=20),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyOpt_EnergyMatch",
-            design=EnergyOptimisedDesign(n_min=50, n_max=500, k_folds=3, n_iter=200),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Pooled_EnergyMatch",
-            design=PooledEnergyMinimizer(n_min=10, n_max=500, n_iter=200),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="FullExt_IPW",
-            design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=N_EXT),
+            design=FixedRatioDesign(treat_ratio=0.6, target_n_aug=0),
             estimator=IPWEstimator()
         )
     ]

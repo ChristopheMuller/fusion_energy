@@ -29,6 +29,8 @@ class PooledEnergyMinimizer(BaseDesign):
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = device
+            
+        self.target_n_aug = None
 
     def _optimise_soft_weights(self, X_pool, X_ext):
         X_pool_torch = torch.tensor(X_pool, dtype=torch.float32, device=self.device)
@@ -95,6 +97,7 @@ class PooledEnergyMinimizer(BaseDesign):
         # 1. Optimise Weights & Find N (using Pooled RCT)
         logits = self._optimise_soft_weights(rct_pool.X, ext_pool.X)
         best_n_aug = self._search_best_n(rct_pool.X, ext_pool.X, logits)
+        self.target_n_aug = best_n_aug
         
         # 2. Perform Split (Balance final sample sizes)
         n_treat = int((n_rct + best_n_aug) / 2)

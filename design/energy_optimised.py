@@ -37,6 +37,8 @@ class EnergyOptimisedDesign(BaseDesign):
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = device
+            
+        self.target_n_aug = None
 
     def _estimate_optimal_augmentation(self, X_rct, X_ext):
         n_rct = X_rct.shape[0]
@@ -120,6 +122,7 @@ class EnergyOptimisedDesign(BaseDesign):
 
     def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes) -> SplitData:
         best_n_aug = self._estimate_optimal_augmentation(rct_pool.X, ext_pool.X)
+        self.target_n_aug = best_n_aug
         n_rct = rct_pool.X.shape[0]
         
         if self.ratio_trt_before_augmentation is not None:

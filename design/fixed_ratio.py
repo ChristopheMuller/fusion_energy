@@ -7,9 +7,9 @@ class FixedRatioDesign(BaseDesign):
     A design that splits the RCT data according to a fixed ratio (e.g., 1:1)
     and targets a pre-determined fixed number of external samples.
     """
-    def __init__(self, treat_ratio=0.5, fixed_n_aug=100):
+    def __init__(self, treat_ratio=0.5, target_n_aug=100):
         self.treat_ratio = treat_ratio
-        self.fixed_n_aug = fixed_n_aug
+        self.target_n_aug = target_n_aug
 
     def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes) -> SplitData:
         n_rct = rct_pool.X.shape[0]
@@ -29,5 +29,5 @@ class FixedRatioDesign(BaseDesign):
             X_external=ext_pool.X,
             Y_external=ext_pool.Y0,
             true_sate=true_sate,
-            target_n_aug=self.fixed_n_aug
+            target_n_aug=self.target_n_aug
         )

@@ -5,8 +5,11 @@ class BaseEstimator(ABC):
     """
     Abstract base class for estimators.
     """
+    def __init__(self, n_external: int = None):
+        self.n_external = n_external
+
     @abstractmethod
-    def estimate(self, data: SplitData) -> EstimationResult:
+    def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
         """
         Estimate the treatment effect given the split data.
 

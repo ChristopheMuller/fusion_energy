@@ -11,7 +11,8 @@ class EnergyMatchingEstimator(BaseEstimator):
     Selects a subset of external controls that minimizes the Energy Distance 
     between the pooled control arm (Internal + Selected External) and the Treatment arm.
     """
-    def __init__(self, k_best=100, lr=0.05, n_iter=300, device=None):
+    def __init__(self, k_best=100, lr=0.05, n_iter=300, device=None, n_external: int = None):
+        super().__init__(n_external=n_external)
         self.k_best = k_best
         self.lr = lr
         self.n_iter = n_iter
@@ -20,10 +21,18 @@ class EnergyMatchingEstimator(BaseEstimator):
         else:
             self.device = device
 
-    def estimate(self, data: SplitData) -> EstimationResult:
+    def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
         n_int = data.X_control_int.shape[0]
         n_ext = data.X_external.shape[0]
-        target_n = data.target_n_aug
+        
+        # Determine target_n
+        if n_external is not None:
+            target_n = n_external
+        elif self.n_external is not None:
+            target_n = int(self.n_external)
+        else:
+            target_n = data.target_n_aug
+
         y1_mean = np.mean(data.Y_treat)
 
         # Edge case: No augmentation

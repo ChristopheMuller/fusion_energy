@@ -8,14 +8,25 @@ class IPWEstimator(BaseEstimator):
     Estimates ATT using Inverse Probability Weighting (IPW) to reweight 
     external controls to look like the internal/target population.
     """
-    def estimate(self, data: SplitData) -> EstimationResult:
+    def __init__(self, n_external: int = None):
+        super().__init__(n_external=n_external)
+
+    def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
         n_int = data.X_control_int.shape[0]
         n_ext = data.X_external.shape[0]
         
+        # Determine target_n
+        if n_external is not None:
+            target_n = n_external
+        elif self.n_external is not None:
+            target_n = int(self.n_external)
+        else:
+            target_n = data.target_n_aug
+
         y1_mean = np.mean(data.Y_treat)
 
         # Edge case: No external data or augmentation not requested
-        if data.target_n_aug == 0 or n_ext == 0:
+        if target_n == 0 or n_ext == 0:
             y0_mean = np.mean(data.Y_control_int)
             ate = y1_mean - y0_mean
             return EstimationResult(
