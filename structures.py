@@ -29,3 +29,10 @@ class EstimationResult:
 
     def n_external_used(self) -> int:
         return np.sum(self.weights_external > 0)
+
+    def ess_external(self) -> float:
+        w = self.weights_external
+        w_sum = np.sum(w)
+        if w_sum == 0:
+            return 0.0
+        return (w_sum**2) / np.sum(w**2)

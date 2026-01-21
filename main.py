@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
+from structures import EstimationResult
 from generators import DataGenerator
 from designs import FixedRatioDesign, EnergyOptimizedDesign, PooledEnergyMinimizer
 from estimators import IPWEstimator, EnergyMatchingEstimator
@@ -19,7 +20,7 @@ VAR_EXT = 1.5
 BIAS_EXT = 1
 BETA_BIAS_EXT = 0.
 
-N_RCT = 500
+N_RCT = 300
 N_EXT = 1000
 # -------------------------
 
@@ -49,7 +50,7 @@ PIPELINES = [
         ),
         MethodPipeline(
             name="Fixed_EnergyMatching",
-            design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=100),
+            design=FixedRatioDesign(treat_ratio=0.5, fixed_n_aug=20),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
@@ -67,21 +68,29 @@ PIPELINES = [
 
 @dataclass
 class SimLog:
-    """Stores bias from each simulation run"""
-    errors: List[float] = field(default_factory=list)
-    estimates: List[float] = field(default_factory=list)
+    """Stores full results from each simulation run"""
+    results: List[EstimationResult] = field(default_factory=list)
 
     def compute_metrics(self):
-        errors_arr = np.array(self.errors)
+        errors = [r.bias for r in self.results]
+        estimates = [r.ate_est for r in self.results]
+        n_exts = [r.n_external_used() for r in self.results]
+        ess_vals = [r.ess_external() for r in self.results]
+        
+        errors_arr = np.array(errors)
         
         mse = np.mean(errors_arr**2)
         bias = np.mean(errors_arr)
-        variance = np.var(self.estimates)
+        variance = np.var(estimates)
+        avg_n_ext = np.mean(n_exts)
+        avg_ess = np.mean(ess_vals)
 
         return {
             "MSE": mse,
             "Bias^2": bias**2,
             "Variance": variance,
+            "Avg N_Ext": avg_n_ext,
+            "Avg ESS": avg_ess,
             "Check (Bias^2+Var)": bias**2 + variance
         }
 
@@ -104,7 +113,7 @@ def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_
         split_data = pipe.design.split(rct_data, ext_data)
         # estimate
         res = pipe.estimator.estimate(split_data)
-        results[pipe.name] = (res.bias, res.ate_est)
+        results[pipe.name] = res
     
     return results
 
@@ -136,10 +145,9 @@ def run_monte_carlo(n_sims=100):
     )
 
     # Aggregate results
-    for res in parallel_results:
-        for method_name, (bias, est) in res.items():
-            logs[method_name].errors.append(bias)
-            logs[method_name].estimates.append(est)
+    for res_dict in parallel_results:
+        for method_name, est_res in res_dict.items():
+            logs[method_name].results.append(est_res)
 
     # Report
     print("\n--- Simulation Results ---")
@@ -150,7 +158,7 @@ def run_monte_carlo(n_sims=100):
         results.append(metrics)
     
     df_results = pd.DataFrame(results).sort_values("MSE")
-    cols = ["Method", "MSE", "Bias^2", "Variance"]
+    cols = ["Method", "MSE", "Bias^2", "Variance", "Avg N_Ext", "Avg ESS"]
     print(df_results[cols].to_string(index=False))
 
 if __name__ == "__main__":
