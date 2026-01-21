@@ -34,17 +34,6 @@ class EnergyMatchingEstimator(BaseEstimator):
             target_n = data.target_n_aug
 
         y1_mean = np.mean(data.Y_treat)
-
-        # Edge case: No augmentation
-        if target_n == 0 or n_ext == 0:
-            ate = y1_mean - np.mean(data.Y_control_int)
-            return EstimationResult(
-                ate_est=ate,
-                bias=ate - data.true_sate,
-                error=(ate - data.true_sate)**2,
-                weights_internal=np.ones(n_int),
-                weights_external=np.zeros(n_ext)
-            )
         
         # 1. Tensor Setup
         X_t = torch.tensor(data.X_treat, dtype=torch.float32, device=self.device)
@@ -80,7 +69,6 @@ class EnergyMatchingEstimator(BaseEstimator):
         return EstimationResult(
             ate_est=ate,
             bias=ate - data.true_sate,
-            error=(ate - data.true_sate)**2,
             weights_internal=w_int,
             weights_external=w_ext
         )

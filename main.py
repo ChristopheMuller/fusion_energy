@@ -4,15 +4,16 @@ from joblib import Parallel, delayed
 from structures import EstimationResult
 from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer, IPWBalanceDesign
-from estimator import IPWEstimator, EnergyMatchingEstimator, DummyMatchingEstimator
+from estimator import IPWEstimator, EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 150
+N_SIMS = 100
 DIM = 3
 
+EFFECT_SIZE = 2.0
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
 
@@ -44,23 +45,33 @@ PIPELINES = [
             estimator=IPWEstimator()
         ),
         MethodPipeline(
-            name="Energy_Matching_Fixed10",
+            name="EnergyMatching_5",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=5),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_10",
             design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=10),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="Energy_Matching_Fixed10",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=10),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_Fixed20",
+            name="EnergyMatching_20",
             design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=20),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="Energy_Matching_Fixed30",
+            name="EnergyMatching_30",
             design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=30),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_25",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=25),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_15",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=15),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
@@ -77,7 +88,12 @@ PIPELINES = [
             name="IPW_BalanceDesign_EnergyMatching",
             design=IPWBalanceDesign(ratio_trt_after_augmentation=0.5),
             estimator=EnergyMatchingEstimator()
-        )
+        ),
+        MethodPipeline(
+            name="Energy_Weighting",
+            design=EnergyOptimisedDesign(),
+            estimator=EnergyWeightingEstimator()
+        ),
     ]
 # ----------------------
 
@@ -109,7 +125,7 @@ class SimLog:
             "Check (Bias^2+Var)": bias**2 + variance
         }
 
-def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, pipelines):
+def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, effect_size, pipelines):
     """Runs a single iteration of the simulation."""
     # Ensure independent randomness per process
     rng = np.random.default_rng(seed)
@@ -118,7 +134,7 @@ def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_
     gen = DataGenerator(dim=dim, beta=beta)
     
     # 1. Generate Data
-    rct_data = gen.generate_rct_pool(n=n_rct, mean=mean_rct, var=var_rct)
+    rct_data = gen.generate_rct_pool(n=n_rct, mean=mean_rct, var=var_rct, effect_size=effect_size)
     ext_data = gen.generate_external_pool(n=n_ext, mean=mean_rct-bias_ext, var=var_ext, beta_bias=beta_bias_ext)
 
     results = {}
@@ -155,6 +171,7 @@ def run_monte_carlo(n_sims=100):
             var_ext=VAR_EXT,
             bias_ext=BIAS_EXT,
             beta_bias_ext=BETA_BIAS_EXT,
+            effect_size=EFFECT_SIZE,
             pipelines=PIPELINES
         ) for seed in seeds
     )

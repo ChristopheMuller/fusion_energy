@@ -111,7 +111,6 @@ class IPWEstimator(BaseEstimator):
         return EstimationResult(
             ate_est=ate,
             bias=ate - data.true_sate,
-            error=(ate - data.true_sate)**2,
             weights_internal=w_int,
             weights_external=w_ext
         )

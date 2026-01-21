@@ -23,7 +23,6 @@ class SplitData:
 class EstimationResult:
     ate_est: float
     bias: float
-    error: float
     weights_internal: np.ndarray
     weights_external: np.ndarray
 
