@@ -10,17 +10,17 @@ from typing import List, Any
 
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 100
-DIM = 5
+N_SIMS = 150
+DIM = 3
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
 
 VAR_EXT = 1.5
-BIAS_EXT = 1
-BETA_BIAS_EXT = 0.
+BIAS_EXT = 2.5
+BETA_BIAS_EXT = 0.0
 
-N_RCT = 300
+N_RCT = 100
 N_EXT = 1000
 # -------------------------
 
@@ -39,24 +39,39 @@ PIPELINES = [
             estimator=DummyMatchingEstimator()
         ),
         MethodPipeline(
-            name="RCT_ONLY_04",
-            design=FixedRatioDesign(treat_ratio=0.4, target_n_aug=0),
-            estimator=DummyMatchingEstimator()
+            name="IPW",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=0),
+            estimator=IPWEstimator()
         ),
         MethodPipeline(
-            name="RCT_ONLY_06",
-            design=FixedRatioDesign(treat_ratio=0.6, target_n_aug=0),
-            estimator=DummyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Dummy_AllExt",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=N_EXT),
-            estimator=DummyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Dummy_random_10",
+            name="Energy_Matching_Fixed10",
             design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=10),
-            estimator=DummyMatchingEstimator()
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="Energy_Matching_Fixed10",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=10),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="Energy_Matching_Fixed20",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=20),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="Energy_Matching_Fixed30",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=30),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="Energy_Matching_EnergyOpt",
+            design=EnergyOptimisedDesign(),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="Energy_Matching_PooledEnergy",
+            design=PooledEnergyMinimizer(),
+            estimator=EnergyMatchingEstimator()
         )
     ]
 # ----------------------
@@ -70,7 +85,7 @@ class SimLog:
         errors = [r.bias for r in self.results]
         estimates = [r.ate_est for r in self.results]
         n_exts = [r.n_external_used() for r in self.results]
-        ess_vals = [r.ess_external() for r in self.results]
+        sum_w_ext = [r.sum_of_weights_external() for r in self.results]
         
         errors_arr = np.array(errors)
         
@@ -78,14 +93,14 @@ class SimLog:
         bias = np.mean(errors_arr)
         variance = np.var(estimates)
         avg_n_ext = np.mean(n_exts)
-        avg_ess = np.mean(ess_vals)
+        avg_sum_w_ext = np.mean(sum_w_ext)
 
         return {
             "MSE": mse,
             "Bias^2": bias**2,
             "Variance": variance,
             "Avg N_Ext": avg_n_ext,
-            "Avg ESS_Ext": avg_ess,
+            "Avg Sum W_Ext": avg_sum_w_ext,
             "Check (Bias^2+Var)": bias**2 + variance
         }
 
@@ -153,7 +168,7 @@ def run_monte_carlo(n_sims=100):
         results.append(metrics)
     
     df_results = pd.DataFrame(results).sort_values("MSE")
-    cols = ["Method", "MSE", "Bias^2", "Variance", "Avg N_Ext", "Avg ESS_Ext"]
+    cols = ["Method", "MSE", "Bias^2", "Variance", "Avg N_Ext", "Avg Sum W_Ext"]
     print(df_results[cols].to_string(index=False, float_format="%.3f"))
 
 if __name__ == "__main__":

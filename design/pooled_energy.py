@@ -14,7 +14,7 @@ class PooledEnergyMinimizer(BaseDesign):
     """
     def __init__(self, 
                  k_best=50, 
-                 n_min=10, 
+                 n_min=5, 
                  n_max=500, 
                  lr=0.05, 
                  n_iter=500,

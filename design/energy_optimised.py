@@ -14,7 +14,7 @@ class EnergyOptimisedDesign(BaseDesign):
     def __init__(self, 
                  k_folds=5, 
                  k_best=50, 
-                 n_min=5, 
+                 n_min=2, 
                  n_max=200, 
                  lr=0.05, 
                  n_iter=300,
