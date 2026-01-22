@@ -60,7 +60,7 @@ class EnergyMatchingEstimator(BaseEstimator):
         # 4. Construct Estimation Result
         w_ext = np.zeros(n_ext)
         w_ext[best_indices] = 1.0
-        w_int = np.ones(n_int)
+        w_int = probs
         
         # ATT Estimate
         y0_weighted = (np.sum(data.Y_control_int) + np.sum(data.Y_external[best_indices])) / (n_int + target_n)

@@ -37,7 +37,7 @@ class DummyMatchingEstimator(BaseEstimator):
             return EstimationResult(
                 ate_est=ate,
                 bias=ate - data.true_sate,
-                weights_internal=np.ones(n_int),
+                weights_internal=np.ones(n_ext),
                 weights_external=np.zeros(n_ext)
             )
         
@@ -50,7 +50,7 @@ class DummyMatchingEstimator(BaseEstimator):
             
         w_ext = np.zeros(n_ext)
         w_ext[selected_indices] = 1.0
-        w_int = np.ones(n_int)
+        w_int = np.ones(n_ext) / target_n
         
         # Calculate Outcome
         # We assume simple pooling of Internal Control + Selected External

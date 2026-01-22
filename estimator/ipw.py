@@ -105,12 +105,12 @@ class IPWEstimator(BaseEstimator):
             w_ext = np.zeros(n_ext)
                     
         # 7. Internal Weights (Fixed at 1.0)
-        w_int = np.ones(n_int)
+        w_int = raw_odds
 
         # 8. Compute Weighted Mean of Control Outcomes
         # Weighted Average = (Sum(Y_int*1) + Sum(Y_ext*w_ext)) / (N_int + Sum(w_ext))
         # Note: Sum(w_ext) is exactly target_n now.
-        y0_weighted_sum = np.sum(data.Y_control_int * w_int) + np.sum(data.Y_external * w_ext)
+        y0_weighted_sum = np.sum(data.Y_control_int * np.ones(n_int)) + np.sum(data.Y_external * w_ext)
         total_weight = n_int + target_n # Exact sum
         
         y0_weighted_mean = y0_weighted_sum / total_weight

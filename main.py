@@ -13,7 +13,7 @@ from visualisations import plot_error_boxplots, plot_pca_weights
 
 # ----- GLOBAL CONFIG ----- 
 N_SIMS = 50
-DIM = 2
+DIM = 4
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
@@ -21,7 +21,7 @@ VAR_RCT = 1.0
 VAR_EXT = 1.5
 BIAS_EXT = 1.5
 BETA_BIAS_EXT = 0.0
-CORR = 0.5
+CORR = 0.2
 
 N_RCT = 200
 N_EXT = 500
@@ -55,21 +55,6 @@ PIPELINES = [
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="EnergyMatching_20",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=20),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_50",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=50),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_75",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=75),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
             name="Energy_Matching_EnergyOpt",
             design=EnergyOptimisedDesign(),
             estimator=EnergyMatchingEstimator()
@@ -83,6 +68,11 @@ PIPELINES = [
             name="Energy_Weighting",
             design=EnergyOptimisedDesign(),
             estimator=EnergyWeightingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyOpt_IPW",
+            design=EnergyOptimisedDesign(),
+            estimator=IPWEstimator()
         ),
     ]
 # ----------------------
