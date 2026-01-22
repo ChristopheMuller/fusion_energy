@@ -11,16 +11,13 @@ class IPWEstimator(BaseEstimator):
     
     STRATEGY B (Targeting Treated):
     This estimator fits a propensity model to distinguish between Treated (1)
-    and External Controls (0). It then weights the External Controls to match 
-    the covariate distribution of the Treated group directly.
+    and External Controls (0). 
     
-    Internal Controls are assumed to represent the Treated population 
-    (due to RCT randomization) and are assigned a weight of 1.0.
-
-    Robustness features:
-    - StandardScaler + LogisticRegressionCV for automatic regularization.
-    - Propensity score clipping to satisfy positivity.
-    - Weight trimming (winsorizing) to reduce variance from extreme weights.
+    Weighting Logic:
+    1. Internal Controls: Fixed weight = 1.0 (Assume perfect representation).
+    2. External Controls: 
+       - Calculate IPW Odds weights to match Treated distribution.
+       - Re-normalize these weights so their sum equals 'target_n'.
     """
     def __init__(self, 
                  n_external: int = None,
@@ -33,7 +30,6 @@ class IPWEstimator(BaseEstimator):
             n_external (int): Optional override for target augmentation size.
             clip_min (float): Min propensity score to avoid instability.
             clip_max (float): Max propensity score.
-            weight_trim_quantile (float): Quantile to clip extreme weights (e.g. 0.99).
             cv (int): Cross-validation folds for LogisticRegressionCV.
             max_iter (int): Max iterations for the solver.
         """
@@ -57,8 +53,16 @@ class IPWEstimator(BaseEstimator):
             target_n = data.target_n_aug
 
         y1_mean = np.mean(data.Y_treat)
-
         
+        # Edge case: No augmentation requested
+        if target_n == 0 or n_ext == 0:
+            return EstimationResult(
+                ate_est=y1_mean - np.mean(data.Y_control_int),
+                bias=None, # Cannot compute without true SATE specific to this split
+                weights_internal=np.ones(n_int),
+                weights_external=np.zeros(n_ext)
+            )
+
         # 1. Prepare Data for Propensity Model
         # Train on External (0) vs Treated (1)
         X_pool = np.vstack([data.X_external, data.X_treat])
@@ -72,7 +76,7 @@ class IPWEstimator(BaseEstimator):
                 cv=self.cv,
                 solver='lbfgs',
                 max_iter=self.max_iter,
-                class_weight='balanced', # Handles size imbalance between Ext/Trt
+                class_weight='balanced',
                 scoring='neg_log_loss',
                 l1_ratios=(0,),
                 use_legacy_attributes=False
@@ -81,32 +85,36 @@ class IPWEstimator(BaseEstimator):
         model.fit(X_pool, source_labels)
         
         # 3. Predict Propensity Scores P(Treated | X) for EXTERNAL units
-        # We need to know "How much does this External unit look like a Treated unit?"
         scores_ext = model.predict_proba(data.X_external)[:, 1]
         
         # 4. Clip Probabilities (Positivity Assumption)
         scores_ext = np.clip(scores_ext, self.clip_min, self.clip_max)
         
-        # 5. Calculate Weights: Odds (p / 1-p)
-        # This transforms the External distribution -> Treated distribution
-        raw_weights_ext = scores_ext
+        # 5. Calculate Raw IPW Weights (Odds)
+        # Formula: p / (1-p) transforms distribution from External -> Treated
+        raw_odds = scores_ext / (1 - scores_ext)
+        
+        # 6. Normalize Weights to sum to target_n
+        sum_odds = np.sum(raw_odds)
+        
+        if sum_odds > 0:
+            # Rescale: (Weight / Sum) * Target_Total
+            w_ext = (raw_odds / sum_odds) * target_n
+        else:
+            # Fallback (should not happen with clipping)
+            w_ext = np.zeros(n_ext)
                     
-        # 7. Internal Weights
-        # Internal controls are already randomized from the same population as Treated,
-        # so they represent the target distribution naturally.
+        # 7. Internal Weights (Fixed at 1.0)
         w_int = np.ones(n_int)
-        w_ext = raw_weights_ext
 
         # 8. Compute Weighted Mean of Control Outcomes
-        # Note: We sum weighted outcomes from both Internal and External
+        # Weighted Average = (Sum(Y_int*1) + Sum(Y_ext*w_ext)) / (N_int + Sum(w_ext))
+        # Note: Sum(w_ext) is exactly target_n now.
         y0_weighted_sum = np.sum(data.Y_control_int * w_int) + np.sum(data.Y_external * w_ext)
-        total_weight = np.sum(w_int) + np.sum(w_ext)
+        total_weight = n_int + target_n # Exact sum
         
-        if total_weight == 0:
-            ate = y1_mean 
-        else:
-            y0_weighted_mean = y0_weighted_sum / total_weight
-            ate = y1_mean - y0_weighted_mean
+        y0_weighted_mean = y0_weighted_sum / total_weight
+        ate = y1_mean - y0_weighted_mean
 
         return EstimationResult(
             ate_est=ate,
