@@ -69,6 +69,6 @@ class EnergyWeightingEstimator(BaseEstimator):
         return EstimationResult(
             ate_est=ate,
             bias=ate - data.true_sate,
-            weights_internal=w_ext,
+            weights_continuous=w_ext,
             weights_external=w_ext
         )

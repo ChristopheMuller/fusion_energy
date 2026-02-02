@@ -30,7 +30,7 @@ def test_plot_pca_weights(split_data, tmp_path):
     est_result = EstimationResult(
         ate_est=1.9,
         bias=-0.1,
-        weights_internal=np.random.rand(n_ext),
+        weights_continuous=np.random.rand(n_ext),
         weights_external=np.random.rand(n_ext)
     )
 

@@ -100,7 +100,7 @@ def plot_pca_weights(split_data, est_result, title, filename):
     
     Args:
         split_data: SplitData object containing X_treat, X_control_int, X_external.
-        est_result: EstimationResult object containing weights_external and weights_internal.
+        est_result: EstimationResult object containing weights_external and weights_continuous.
         title: Title of the plot.
         filename: Path to save the plot.
     """
@@ -148,7 +148,7 @@ def plot_pca_weights(split_data, est_result, title, filename):
     
     weight_sets = {
         "external": est_result.weights_external,
-        "internal": est_result.weights_internal
+        "internal": est_result.weights_continuous
     }
     
     for suffix, weights in weight_sets.items():

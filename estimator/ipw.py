@@ -59,7 +59,7 @@ class IPWEstimator(BaseEstimator):
             return EstimationResult(
                 ate_est=y1_mean - np.mean(data.Y_control_int),
                 bias=None, # Cannot compute without true SATE specific to this split
-                weights_internal=np.ones(n_int),
+                weights_continuous=np.ones(n_int),
                 weights_external=np.zeros(n_ext)
             )
 
@@ -119,6 +119,6 @@ class IPWEstimator(BaseEstimator):
         return EstimationResult(
             ate_est=ate,
             bias=ate - data.true_sate,
-            weights_internal=w_int,
+            weights_continuous=w_int,
             weights_external=w_ext
         )

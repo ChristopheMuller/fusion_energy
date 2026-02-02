@@ -23,7 +23,7 @@ class SplitData:
 class EstimationResult:
     ate_est: float
     bias: float
-    weights_internal: np.ndarray
+    weights_continuous: np.ndarray
     weights_external: np.ndarray
 
     def n_external_used(self) -> int:

@@ -12,7 +12,7 @@ def verify_estimation_result(res: EstimationResult, n_int: int, n_ext: int):
     assert isinstance(res, EstimationResult)
     assert isinstance(res.ate_est, float)
     # The current implementation seems to return weights of size n_ext for both internal and external
-    assert len(res.weights_internal) == n_ext
+    assert len(res.weights_continuous) == n_ext
     assert len(res.weights_external) == n_ext
 
 def test_ipw_estimator(split_data):

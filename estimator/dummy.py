@@ -37,7 +37,7 @@ class DummyMatchingEstimator(BaseEstimator):
             return EstimationResult(
                 ate_est=ate,
                 bias=ate - data.true_sate,
-                weights_internal=np.ones(n_ext),
+                weights_continuous=np.ones(n_ext),
                 weights_external=np.zeros(n_ext)
             )
         
@@ -65,6 +65,6 @@ class DummyMatchingEstimator(BaseEstimator):
         return EstimationResult(
             ate_est=ate,
             bias=ate - data.true_sate,
-            weights_internal=w_int,
+            weights_continuous=w_int,
             weights_external=w_ext
         )
