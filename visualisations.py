@@ -148,7 +148,7 @@ def plot_pca_weights(split_data, est_result, title, filename):
     
     weight_sets = {
         "external": est_result.weights_external,
-        "internal": est_result.weights_continuous
+        "continuous": est_result.weights_continuous
     }
     
     for suffix, weights in weight_sets.items():
