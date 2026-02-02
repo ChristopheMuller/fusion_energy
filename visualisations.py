@@ -180,7 +180,7 @@ def plot_pca_weights(split_data, est_result, title, filename):
             # Plot selected
             if np.any(selected_mask):
                 plt.scatter(proj_ext[selected_mask, 0], proj_ext[selected_mask, 1], 
-                            alpha=0.6, color='blue', marker='o', label='External (Selected)', s=40)
+                            alpha=0.6, color='blue', marker='o', label=f'External (Selected, n={np.sum(selected_mask)})', s=40)
                 
         else:
             # Continuous weighting
@@ -309,7 +309,7 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
     # Highlight Min MSE
     ax1.scatter(min_mse_row["Avg_N_Ext"], min_mse_row["MSE"], 
                 color='darkgreen', s=200, zorder=10, marker='*', 
-                label=f'Min MSE ({min_mse_row["MSE"]:.4f})')
+                label=f'Min MSE ({min_mse_row["Avg_N_Ext"]:.1f})')
 
     ax1.set_xlabel('Average External Data Points (Sum of weights)')
     ax1.set_ylabel('MSE Metrics')
@@ -322,7 +322,7 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
     # Highlight Min Energy
     ax2.scatter(min_energy_row["Avg_N_Ext"], min_energy_row["Energy"], 
                 color='indigo', s=200, zorder=10, marker='*', 
-                label=f'Min Energy ({min_energy_row["Energy"]:.4f})')
+                label=f'Min Energy ({min_energy_row["Avg_N_Ext"]:.1f})')
 
     ax2.set_ylabel('Energy Distance', color='mediumpurple')
     ax2.tick_params(axis='y', labelcolor='mediumpurple')
@@ -340,3 +340,35 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
     plt.savefig(filename)
     plt.close()
     print(f"Saved metric curves plot to {filename}")
+
+def plot_weight_ranks(est_result, title, filename, n_external=None):
+    """
+    Plots the continuous weights ranked from largest to smallest.
+    
+    Args:
+        est_result: EstimationResult object containing weights_continuous.
+        title: Title of the plot.
+        filename: Path to save the plot.
+    """
+    import numpy as np
+    
+    weights = est_result.weights_continuous
+    
+    # Sort weights descending
+    sorted_weights = np.sort(weights)[::-1]
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(len(sorted_weights)), sorted_weights, marker='o', linestyle='-', markersize=2, alpha=0.7)
+
+    if n_external is not None:
+        plt.axvline(n_external - 1, color='red', linestyle='--', label=f'Target n_external = {n_external}')
+    
+    plt.title(f"{title} - Weight Ranks")
+    plt.xlabel("Rank")
+    plt.ylabel("Weight Value")
+    plt.grid(True, linestyle='--', alpha=0.5)
+    
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    plt.savefig(filename)
+    plt.close()
+    print(f"Saved weight rank plot to {filename}")

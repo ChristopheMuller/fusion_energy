@@ -1,7 +1,7 @@
 import os
 import pytest
 import numpy as np
-from visualisations import plot_error_boxplots, plot_pca_weights, plot_metric_curves, plot_mse_decomposition, plot_energy_distance
+from visualisations import plot_error_boxplots, plot_pca_weights, plot_metric_curves, plot_mse_decomposition, plot_energy_distance, plot_weight_ranks
 from structures import EstimationResult
 
 def test_plot_error_boxplots(tmp_path):

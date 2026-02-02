@@ -14,18 +14,19 @@ from visualisations import (
     plot_pca_weights, 
     plot_mse_decomposition, 
     plot_energy_distance,
-    plot_metric_curves
+    plot_metric_curves,
+    plot_weight_ranks
 )
 
 # ----- GLOBAL CONFIG ----- 
 N_SIMS = 100
-DIM = 2
+DIM = 3
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
 
 VAR_EXT = 1.5
-BIAS_EXT = 1      # Mean shift in external data
+BIAS_EXT = 1.3      # Mean shift in external data
 BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 CORR = 0.3
 
@@ -62,11 +63,6 @@ PIPELINES = [
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="EnergyMatching_7",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=7),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
             name="EnergyMatching_10",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=10),
             estimator=EnergyMatchingEstimator()
@@ -89,11 +85,6 @@ PIPELINES = [
         MethodPipeline(
             name="EnergyMatching_40",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=40),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_41",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=41),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
@@ -253,6 +244,10 @@ def run_monte_carlo(n_sims=100):
         
         plot_filename = f"plots/{pipe.name}/pca_weights.png"
         plot_pca_weights(split_data, est_result, f"PCA Weights - {pipe.name}", plot_filename)
+        
+        rank_filename = f"plots/{pipe.name}/weights_rank.png"
+        n_ext = split_data.target_n_aug
+        plot_weight_ranks(est_result, f"Weight Ranks - {pipe.name}", rank_filename, n_external=n_ext)
 
 
 if __name__ == "__main__":

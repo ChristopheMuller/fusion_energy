@@ -19,7 +19,7 @@ class EnergyOptimisedDesign(BaseDesign):
                  n_max=200, 
                  lr=0.05, 
                  n_iter=300,
-                 ratio_trt_after_augmentation=0.5,
+                 ratio_trt_after_augmentation=None,
                  ratio_trt_before_augmentation=None,
                  device=None):
         self.k_folds = k_folds
@@ -30,6 +30,9 @@ class EnergyOptimisedDesign(BaseDesign):
         self.n_iter = n_iter
         self.ratio_trt_after_augmentation = ratio_trt_after_augmentation
         self.ratio_trt_before_augmentation = ratio_trt_before_augmentation
+
+        if self.ratio_trt_before_augmentation is None and self.ratio_trt_after_augmentation is None:
+            self.ratio_trt_before_augmentation = 0.5
 
         if self.ratio_trt_before_augmentation is not None and self.ratio_trt_after_augmentation is not None:
             raise ValueError("Specify only one of ratio_trt_before_augmentation or ratio_trt_after_augmentation.")
@@ -46,29 +49,25 @@ class EnergyOptimisedDesign(BaseDesign):
         optimal_ns = []
         X_ext_torch = torch.tensor(X_ext, dtype=torch.float32, device=self.device)
         
-        # Precompute Source-Source distance (invariant across folds)
         d_ss = torch.cdist(X_ext_torch, X_ext_torch)
         
         for fold in range(self.k_folds):
-            # 1. Split RCT 1:1 into "Simulated Target" and "Simulated Internal"
             indices = rng.permutation(n_rct)
             n_treat_sim = n_rct // 2
             
             X_t_sim = torch.tensor(X_rct[indices[:n_treat_sim]], dtype=torch.float32, device=self.device)
             X_c_sim = torch.tensor(X_rct[indices[n_treat_sim:]], dtype=torch.float32, device=self.device)
             
-            # 2. Optimise Soft Weights (Gradient Descent)
             logits = self._optimise_soft_weights(X_t_sim, X_c_sim, X_ext_torch, d_ss=d_ss)
             
-            # 3. Find optimal n (Ternary Search)
+            # Now using Golden Section Search
             best_n_fold = self._search_best_n(X_t_sim, X_c_sim, X_ext_torch, logits)
             optimal_ns.append(best_n_fold)
 
-        return int(np.mean(optimal_ns))
+        return int(np.median(optimal_ns))
 
     def _optimise_soft_weights(self, X_t, X_c, X_e, d_ss=None):
         n_e = X_e.shape[0]
-        # Use a proxy N (midpoint) to learn stable ranking
         proxy_n = (self.n_min + min(self.n_max, n_e)) // 2
         
         return optimise_soft_weights(
@@ -82,45 +81,63 @@ class EnergyOptimisedDesign(BaseDesign):
         )
 
     def _evaluate_n_energy(self, n, logits, X_t, X_c, X_e):
-        if n == 0: return 9999.0
+        n = int(round(n))
+        if n <= 0: return 9999.0
         
-        # 1. Sample Indices (Optimised)
         probs = F.softmax(logits, dim=0)
-        # torch.multinomial is significantly faster than a loop of np.random.choice
-        # and keeps computations on the device.
         batch_idx = torch.multinomial(
             probs.expand(self.k_best, -1),
             num_samples=n,
             replacement=False
         )
         
-        # 2. Compute Energy (Batch Mode)
         X_aug = X_e[batch_idx] 
         energies = compute_batch_energy(X_aug, X_t, X_c)
         
         return torch.min(energies).item()
 
     def _search_best_n(self, X_t, X_c, X_e, logits):
+        """
+        Golden Section Search for finding the minimum of a unimodal function.
+        """
         n_e = X_e.shape[0]
-        left = self.n_min
-        right = min(self.n_max, n_e)
+        a = self.n_min
+        b = min(self.n_max, n_e)
+        
+        # Golden ratio constant
+        inv_phi = (np.sqrt(5) - 1) / 2  # ~0.618
+        
         cache = {}
-        
         def get_score(n):
-            if n in cache: return cache[n]
-            val = self._evaluate_n_energy(n, logits, X_t, X_c, X_e)
-            cache[n] = val
+            n_int = int(round(n))
+            if n_int in cache: return cache[n_int]
+            val = self._evaluate_n_energy(n_int, logits, X_t, X_c, X_e)
+            cache[n_int] = val
             return val
-        
-        while right - left > 2:
-            m1 = left + (right - left) // 3
-            m2 = right - (right - left) // 3
-            if get_score(m1) < get_score(m2):
-                right = m2
+
+        # Initial points
+        x1 = b - inv_phi * (b - a)
+        x2 = a + inv_phi * (b - a)
+        f1 = get_score(x1)
+        f2 = get_score(x2)
+
+        # Iterate until the range is small (e.g., 2 units)
+        while (b - a) > 2:
+            if f1 < f2:
+                b = x2
+                x2 = x1
+                f2 = f1
+                x1 = b - inv_phi * (b - a)
+                f1 = get_score(x1)
             else:
-                left = m1
-                
-        candidates = range(left, right + 1)
+                a = x1
+                x1 = x2
+                f1 = f2
+                x2 = a + inv_phi * (b - a)
+                f2 = get_score(x2)
+
+        # Final check of the small bracket
+        candidates = range(int(round(a)), int(round(b)) + 1)
         scores = [get_score(n) for n in candidates]
         return candidates[np.argmin(scores)]
 
@@ -136,7 +153,6 @@ class EnergyOptimisedDesign(BaseDesign):
         else:
             n_treat = int((n_rct + best_n_aug) * self.ratio_trt_after_augmentation)
         
-        # Safety bounds
         n_treat = min(max(n_treat, 10), n_rct - 10)
 
         indices = local_rng.permutation(n_rct)
