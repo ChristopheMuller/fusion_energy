@@ -35,6 +35,64 @@ def plot_error_boxplots(logs: Dict[str, Any], filename="plots/error_boxplots.png
     plt.close()
     print(f"Saved boxplot to {filename}")
 
+def plot_mse_decomposition(logs: Dict[str, Any], filename="plots/mse_decomposition.png"):
+    """
+    Generates a stacked bar chart of MSE decomposed into Squared Bias and Variance.
+    
+    Args:
+        logs: Dictionary mapping method names to SimLog objects.
+        filename: Path to save the plot.
+    """
+    import numpy as np
+    
+    data = []
+    for method_name, log in logs.items():
+        # Extract results
+        errors = np.array([res.bias for res in log.results])
+        estimates = np.array([res.ate_est for res in log.results])
+        
+        # Compute metrics
+        bias_val = np.mean(errors)
+        squared_bias = bias_val**2
+        variance = np.var(estimates)
+        mse = squared_bias + variance
+        
+        data.append({
+            "Method": method_name,
+            "Squared Bias": squared_bias,
+            "Variance": variance,
+            "MSE": mse
+        })
+    
+    df = pd.DataFrame(data)
+    
+    # Plotting
+    plt.figure(figsize=(12, 8))
+    
+    # Create stacked bars
+    # We plot Variance at the bottom, Squared Bias on top
+    p1 = plt.bar(df["Method"], df["Variance"], label='Variance', color='skyblue', alpha=0.8)
+    p2 = plt.bar(df["Method"], df["Squared Bias"], bottom=df["Variance"], label='Squared Bias', color='salmon', alpha=0.8)
+    
+    plt.ylabel('Mean Squared Error')
+    plt.title('MSE Decomposition: Squared Bias + Variance')
+    plt.xticks(rotation=45, ha='right')
+    plt.legend()
+    plt.grid(axis='y', linestyle='--', alpha=0.5)
+    
+    # Add text labels for MSE
+    for i, row in enumerate(df.itertuples()):
+        total_height = row.MSE
+        plt.text(i, total_height + (0.01 * max(df["MSE"])), f"{total_height:.3f}", 
+                 ha='center', va='bottom', fontsize=9)
+
+    plt.tight_layout()
+    
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    plt.savefig(filename)
+    plt.close()
+    print(f"Saved MSE decomposition plot to {filename}")
+
 def plot_pca_weights(split_data, est_result, title, filename):
     """
     Computes PCA on RCT data, projects External data, and plots weights.
@@ -68,6 +126,11 @@ def plot_pca_weights(split_data, est_result, title, filename):
     
     # SVD: X = U S Vt. Components are rows of Vt.
     u, s, vt = np.linalg.svd(X_rct_centered, full_matrices=False)
+    
+    # Calculate explained variance ratio
+    explained_variance = (s**2) / np.sum(s**2)
+    var_pc1 = explained_variance[0] * 100 if len(explained_variance) > 0 else 0
+    var_pc2 = explained_variance[1] * 100 if len(explained_variance) > 1 else 0
     
     if vt.shape[0] < 2:
         components = np.eye(vt.shape[1])[:, :2]
@@ -132,8 +195,8 @@ def plot_pca_weights(split_data, est_result, title, filename):
                         alpha=0.4, color='blue', label='External (Weighted)', s=sizes)
             
         plt.title(f"{title} ({suffix.capitalize()})")
-        plt.xlabel("PC1")
-        plt.ylabel("PC2")
+        plt.xlabel(f"PC1 ({var_pc1:.1f}%)")
+        plt.ylabel(f"PC2 ({var_pc2:.1f}%)")
         plt.legend()
         plt.grid(True, linestyle='--', alpha=0.5)
         

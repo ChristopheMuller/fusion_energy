@@ -9,22 +9,23 @@ from dataclasses import dataclass, field
 from typing import List, Any
 
 
-from visualisations import plot_error_boxplots, plot_pca_weights
+from visualisations import plot_error_boxplots, plot_pca_weights, plot_mse_decomposition
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 50
-DIM = 4
+N_SIMS = 100
+DIM = 3
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
 
-VAR_EXT = 1.5
-BIAS_EXT = 1.5
-BETA_BIAS_EXT = 0.0
-CORR = 0.2
+VAR_EXT = 1.0
+BIAS_EXT = 0.0      # Mean shift in external data
+BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
+CORR = 0.3
 
 N_RCT = 200
-N_EXT = 500
+N_EXT = 1500
+
 # -------------------------
 
 
@@ -45,7 +46,7 @@ class MethodPipeline:
 
 PIPELINES = [
         MethodPipeline(
-            name="RCT_ONLY_05",
+            name="EnergyMatching_0",
             design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=0),
             estimator=DummyMatchingEstimator()
         ),
@@ -55,24 +56,74 @@ PIPELINES = [
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="Energy_Matching_EnergyOpt",
-            design=EnergyOptimisedDesign(),
+            name="EnergyMatching_7",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=7),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="Energy_Matching_PooledEnergy",
-            design=PooledEnergyMinimizer(),
+            name="EnergyMatching_10",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=10),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="Energy_Weighting",
-            design=EnergyOptimisedDesign(),
-            estimator=EnergyWeightingEstimator()
+            name="EnergyMatching_15",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=15),
+            estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
-            name="EnergyOpt_IPW",
-            design=EnergyOptimisedDesign(),
-            estimator=IPWEstimator()
+            name="EnergyMatching_20",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=20),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_30",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=30),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_40",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=40),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_50",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=50),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_75",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=75),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_100",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=100),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_150",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=150),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_200",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=200),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_300",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=300),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_500",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=500),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_999",
+            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=999),
+            estimator=EnergyMatchingEstimator()
         ),
     ]
 # ----------------------
@@ -176,6 +227,7 @@ def run_monte_carlo(n_sims=100):
 
     # Visualisations of results
     plot_error_boxplots(logs)
+    plot_mse_decomposition(logs)
 
     # Visualisations of example data
     print("Generating PCA plots...")
