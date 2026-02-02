@@ -19,18 +19,18 @@ from visualisations import (
 
 # ----- GLOBAL CONFIG ----- 
 N_SIMS = 100
-DIM = 3
+DIM = 2
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
 
-VAR_EXT = 3.
-BIAS_EXT = 0.3      # Mean shift in external data
+VAR_EXT = 1.5
+BIAS_EXT = 1      # Mean shift in external data
 BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 CORR = 0.3
 
 N_RCT = 100
-N_EXT = 1500
+N_EXT = 500
 
 # -------------------------
 
@@ -89,6 +89,11 @@ PIPELINES = [
         MethodPipeline(
             name="EnergyMatching_40",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=40),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_41",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=41),
             estimator=EnergyMatchingEstimator()
         ),
         MethodPipeline(
@@ -243,7 +248,7 @@ def run_monte_carlo(n_sims=100):
     ext_data_plot = gen.generate_external_pool(n=N_EXT, mean=MEAN_RCT-BIAS_EXT, var=VAR_EXT, corr=CORR, beta_bias=BETA_BIAS_EXT)
     
     for pipe in PIPELINES:
-        split_data = pipe.design.split(rct_data_plot, ext_data_plot)
+        split_data = pipe.design.split(rct_data_plot, ext_data_plot, rng=rng_plot)
         est_result = pipe.estimator.estimate(split_data)
         
         plot_filename = f"plots/{pipe.name}/pca_weights.png"

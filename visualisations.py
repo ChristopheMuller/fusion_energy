@@ -295,6 +295,10 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
     
     df = pd.DataFrame(data).sort_values("Avg_N_Ext")
     
+    # Identify minima
+    min_mse_row = df.loc[df["MSE"].idxmin()]
+    min_energy_row = df.loc[df["Energy"].idxmin()]
+
     fig, ax1 = plt.subplots(figsize=(12, 8))
     
     # Plot MSE components on left axis
@@ -302,6 +306,11 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
     ax1.plot(df["Avg_N_Ext"], df["Variance"], marker='s', label='Variance', color='skyblue')
     ax1.plot(df["Avg_N_Ext"], df["MSE"], marker='d', label='MSE', color='green', linewidth=2)
     
+    # Highlight Min MSE
+    ax1.scatter(min_mse_row["Avg_N_Ext"], min_mse_row["MSE"], 
+                color='darkgreen', s=200, zorder=10, marker='*', 
+                label=f'Min MSE ({min_mse_row["MSE"]:.4f})')
+
     ax1.set_xlabel('Average External Data Points (Sum of weights)')
     ax1.set_ylabel('MSE Metrics')
     ax1.grid(True, linestyle='--', alpha=0.5)
@@ -309,6 +318,12 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
     # Create twin axis for Energy Distance
     ax2 = ax1.twinx()
     ax2.plot(df["Avg_N_Ext"], df["Energy"], marker='x', label='Energy Distance', color='mediumpurple', linestyle='--')
+    
+    # Highlight Min Energy
+    ax2.scatter(min_energy_row["Avg_N_Ext"], min_energy_row["Energy"], 
+                color='indigo', s=200, zorder=10, marker='*', 
+                label=f'Min Energy ({min_energy_row["Energy"]:.4f})')
+
     ax2.set_ylabel('Energy Distance', color='mediumpurple')
     ax2.tick_params(axis='y', labelcolor='mediumpurple')
     
