@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 def optimise_soft_weights(
     X_source: torch.Tensor,
@@ -176,3 +177,92 @@ def compute_batch_energy(
         term_self = sum_ss / (n_s**2)
         
         return 2 * term_cross - term_self
+
+
+def compute_weighted_energy(
+    X_target: np.ndarray,
+    X_internal: np.ndarray,
+    X_external: np.ndarray,
+    weights_external: np.ndarray,
+    device=None
+) -> float:
+    """
+    Computes the Energy Distance between:
+    1. Target Distribution (X_target) - Uniform weights
+    2. Source Distribution (Pooled) - Mixture of:
+       - X_internal (Uniform weights = 1.0)
+       - X_external (Provided weights)
+       
+    Args:
+        X_target: (n_t, dim)
+        X_internal: (n_i, dim)
+        X_external: (n_e, dim)
+        weights_external: (n_e,) - Weights for external units.
+        
+    Returns:
+        float: The scalar Energy Distance.
+    """
+    if device is None:
+        device = torch.device("cpu") # Default to CPU for evaluation to save GPU memory/transfer overhead if not needed
+
+    # Convert to Tensor
+    Xt = torch.tensor(X_target, dtype=torch.float32, device=device)
+    Xi = torch.tensor(X_internal, dtype=torch.float32, device=device)
+    Xe = torch.tensor(X_external, dtype=torch.float32, device=device)
+    w_ext = torch.tensor(weights_external, dtype=torch.float32, device=device)
+    
+    n_t = Xt.shape[0]
+    n_i = Xi.shape[0]
+    
+    # Normalize weights
+    # Internal units have weight 1.0
+    w_int_sum = float(n_i)
+    w_ext_sum = w_ext.sum().item()
+    total_weight_source = w_int_sum + w_ext_sum
+    
+    if total_weight_source == 0:
+        return float('inf')
+
+    # --- Term 1: 2 * E[d(Source, Target)] ---
+    # Split into Internal-Target and External-Target
+    
+    # 1a. Internal <-> Target
+    d_it = torch.cdist(Xi, Xt) # (n_i, n_t)
+    sum_it = d_it.sum()
+    
+    # 1b. External <-> Target (Weighted)
+    d_et = torch.cdist(Xe, Xt) # (n_e, n_t)
+    # Sum over target (dim 1), then dot with weights (dim 0)
+    sum_et_per_ext = d_et.sum(dim=1) # (n_e,)
+    sum_et = torch.dot(w_ext, sum_et_per_ext)
+    
+    term_cross = (sum_it + sum_et) / (total_weight_source * n_t)
+    
+    # --- Term 2: E[d(Source, Source)] ---
+    # Split into Int-Int, Int-Ext, Ext-Ext
+    
+    # 2a. Internal <-> Internal
+    d_ii = torch.cdist(Xi, Xi)
+    sum_ii = d_ii.sum()
+    
+    # 2b. Internal <-> External
+    d_ie = torch.cdist(Xi, Xe) # (n_i, n_e)
+    # Sum over int (dim 0), then dot with weights (dim 1)
+    sum_ie_per_ext = d_ie.sum(dim=0) # (n_e,)
+    sum_ie = torch.dot(w_ext, sum_ie_per_ext)
+    
+    # 2c. External <-> External (Weighted both sides)
+    d_ee = torch.cdist(Xe, Xe) # (n_e, n_e)
+    # w^T * D * w
+    sum_ee = torch.dot(w_ext, torch.mv(d_ee, w_ext))
+    
+    term_self_source = (sum_ii + 2 * sum_ie + sum_ee) / (total_weight_source**2)
+    
+    # --- Term 3: E[d(Target, Target)] ---
+    d_tt = torch.cdist(Xt, Xt)
+    sum_tt = d_tt.sum()
+    term_self_target = sum_tt / (n_t**2)
+    
+    energy_dist = 2 * term_cross - term_self_source - term_self_target
+    
+    return energy_dist.item()

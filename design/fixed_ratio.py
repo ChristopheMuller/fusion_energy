@@ -8,9 +8,16 @@ class FixedRatioDesign(BaseDesign):
     A design that splits the RCT data according to a fixed ratio (e.g., 1:1)
     and targets a pre-determined fixed number of external samples.
     """
-    def __init__(self, treat_ratio=0.5, target_n_aug=100, seed_split=None):
-        self.treat_ratio = treat_ratio
+    def __init__(self, treat_ratio_prior=None, treat_ratio_post=None, target_n_aug=100, seed_split=None):
+        self.treat_ratio_prior = treat_ratio_prior
+        self.treat_ratio_post = treat_ratio_post
         self.target_n_aug = target_n_aug
+
+        # only one of treat_ratio and treat_ratio_after should be set
+        if (treat_ratio_prior is None) and (treat_ratio_post is None):
+            treat_ratio_prior = 0.5
+        assert (treat_ratio_prior is not None) != (treat_ratio_post is not None), "Only one of treat_ratio and treat_ratio_after should be set."
+
         if seed_split is not None:
             self.rng = np.random.default_rng(seed_split)
         else:
@@ -18,7 +25,12 @@ class FixedRatioDesign(BaseDesign):
 
     def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes, rng: Optional[np.random.Generator] = None) -> SplitData:
         n_rct = rct_pool.X.shape[0]
-        n_treat = int(n_rct * self.treat_ratio)
+
+        if self.treat_ratio_post is not None:
+            n_treat = int((n_rct + self.target_n_aug) * self.treat_ratio_post)
+            n_treat = min(n_treat, n_rct - 5)
+        elif self.treat_ratio_prior is not None:
+            n_treat = int(n_rct * self.treat_ratio_prior)
 
         # Use provided rng if available, else use internal
         local_rng = rng if rng is not None else self.rng

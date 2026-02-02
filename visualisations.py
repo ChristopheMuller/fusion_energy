@@ -205,3 +205,116 @@ def plot_pca_weights(split_data, est_result, title, filename):
         plt.savefig(out_path)
         plt.close()
         print(f"Saved PCA plot to {out_path}")
+
+
+def plot_energy_distance(logs: Dict[str, Any], filename="plots/energy_distance.png"):
+    """
+    Generates a bar plot of average Energy Distance for each method.
+
+    Args:
+        logs: Dictionary mapping method names to SimLog objects.
+        filename: Path to save the plot.
+    """
+    import numpy as np
+
+    data = []
+    for method_name, log in logs.items():
+        # Extract results
+        energies = np.array([res.energy_distance for res in log.results])
+        
+        mean_energy = np.mean(energies)
+        std_energy = np.std(energies)
+        
+        data.append({
+            "Method": method_name,
+            "Mean Energy Distance": mean_energy,
+            "Std Energy Distance": std_energy
+        })
+    
+    df = pd.DataFrame(data)
+    
+    plt.figure(figsize=(12, 8))
+    
+    # Bar plot with error bars
+    plt.bar(df["Method"], df["Mean Energy Distance"], yerr=df["Std Energy Distance"], 
+            capsize=5, color='mediumpurple', alpha=0.8)
+    
+    plt.ylabel('Mean Energy Distance')
+    plt.title('Average Energy Distance (Target vs. Pooled Control)')
+    plt.xticks(rotation=45, ha='right')
+    plt.grid(axis='y', linestyle='--', alpha=0.5)
+    
+    # Add text labels
+    for i, height in enumerate(df["Mean Energy Distance"]):
+        plt.text(i, height + (0.01 * max(df["Mean Energy Distance"])), f"{height:.4f}", 
+                 ha='center', va='bottom', fontsize=9)
+
+    plt.tight_layout()
+    
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    plt.savefig(filename)
+    plt.close()
+    print(f"Saved Energy Distance plot to {filename}")
+
+
+def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png"):
+    """
+    Generates a line plot of Bias^2, Variance, MSE, and Energy Distance
+    against the average number of external data points used.
+
+    Args:
+        logs: Dictionary mapping method names to SimLog objects.
+        filename: Path to save the plot.
+    """
+    import numpy as np
+    
+    data = []
+    for method_name, log in logs.items():
+        # Extract results
+        errors = np.array([res.bias for res in log.results])
+        estimates = np.array([res.ate_est for res in log.results])
+        n_exts = np.array([res.sum_of_weights_external() for res in log.results])
+        energies = np.array([res.energy_distance for res in log.results])
+        
+        # Compute metrics
+        avg_n_ext = np.mean(n_exts)
+        bias_val = np.mean(errors)
+        squared_bias = bias_val**2
+        variance = np.var(estimates)
+        mse = squared_bias + variance
+        avg_energy = np.mean(energies)
+        
+        data.append({
+            "Method": method_name,
+            "Avg_N_Ext": avg_n_ext,
+            "Squared Bias": squared_bias,
+            "Variance": variance,
+            "MSE": mse,
+            "Energy": avg_energy
+        })
+    
+    df = pd.DataFrame(data).sort_values("Avg_N_Ext")
+    
+    plt.figure(figsize=(12, 8))
+    
+    # Plot lines
+    plt.plot(df["Avg_N_Ext"], df["Squared Bias"], marker='o', label='Bias^2', color='salmon')
+    plt.plot(df["Avg_N_Ext"], df["Variance"], marker='s', label='Variance', color='skyblue')
+    plt.plot(df["Avg_N_Ext"], df["MSE"], marker='d', label='MSE', color='green', linewidth=2)
+    plt.plot(df["Avg_N_Ext"], df["Energy"], marker='x', label='Energy Distance', color='mediumpurple', linestyle='--')
+    
+    plt.xlabel('Average External Data Points (Sum of weights)')
+    plt.ylabel('Value')
+    plt.title('Performance Metrics vs. External Data Sample Size')
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.5)
+    
+    # Optional: Log scale if values vary widely
+    # plt.yscale('log')
+    
+    plt.tight_layout()
+    
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    plt.savefig(filename)
+    plt.close()
+    print(f"Saved metric curves plot to {filename}")
