@@ -1,3 +1,4 @@
+from typing import Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -45,7 +46,7 @@ class PooledEnergyMinimizer(BaseDesign):
             n_iter=self.n_iter
         )
 
-    def _evaluate_n_energy(self, n, logits, X_pool, X_ext):
+    def _evaluate_n_energy(self, n, logits, X_pool, X_ext, rng: Optional[np.random.Generator] = None):
         if n == 0: return 9999.0
         
         X_pool_torch = torch.tensor(X_pool, dtype=torch.float32, device=self.device)
@@ -56,8 +57,10 @@ class PooledEnergyMinimizer(BaseDesign):
         probs /= probs.sum()
         pool_idx = np.arange(len(probs))
         
+        local_rng = rng if rng is not None else np.random.default_rng()
+        
         batch_indices = [
-            np.random.choice(pool_idx, size=n, replace=False, p=probs)
+            local_rng.choice(pool_idx, size=n, replace=False, p=probs)
             for _ in range(self.k_best)
         ]
         batch_idx = torch.tensor(np.array(batch_indices), device=self.device, dtype=torch.long)
@@ -68,14 +71,14 @@ class PooledEnergyMinimizer(BaseDesign):
         
         return torch.min(energies).item()
 
-    def _search_best_n(self, X_pool, X_ext, logits):
+    def _search_best_n(self, X_pool, X_ext, logits, rng: Optional[np.random.Generator] = None):
         left = self.n_min
         right = min(self.n_max, X_ext.shape[0])
         cache = {}
         
         def get_score(n):
             if n in cache: return cache[n]
-            val = self._evaluate_n_energy(n, logits, X_pool, X_ext)
+            val = self._evaluate_n_energy(n, logits, X_pool, X_ext, rng=rng)
             cache[n] = val
             return val
         
@@ -91,19 +94,21 @@ class PooledEnergyMinimizer(BaseDesign):
         scores = [get_score(n) for n in candidates]
         return candidates[np.argmin(scores)]
 
-    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes) -> SplitData:
+    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes, rng: Optional[np.random.Generator] = None) -> SplitData:
         n_rct = rct_pool.X.shape[0]
+        
+        local_rng = rng if rng is not None else np.random.default_rng()
         
         # 1. Optimise Weights & Find N (using Pooled RCT)
         logits = self._optimise_soft_weights(rct_pool.X, ext_pool.X)
-        best_n_aug = self._search_best_n(rct_pool.X, ext_pool.X, logits)
+        best_n_aug = self._search_best_n(rct_pool.X, ext_pool.X, logits, rng=local_rng)
         self.target_n_aug = best_n_aug
         
         # 2. Perform Split (Balance final sample sizes)
         n_treat = int((n_rct + best_n_aug) / 2)
         n_treat = min(max(n_treat, 10), n_rct - 10) 
         
-        indices = np.random.permutation(n_rct)
+        indices = local_rng.permutation(n_rct)
         idx_t = indices[:n_treat]
         idx_c = indices[n_treat:]
         

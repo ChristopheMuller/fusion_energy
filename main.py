@@ -12,14 +12,14 @@ from typing import List, Any
 from visualisations import plot_error_boxplots, plot_pca_weights, plot_mse_decomposition
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 100
+N_SIMS = 150
 DIM = 3
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
 
 VAR_EXT = 1.0
-BIAS_EXT = 0.0      # Mean shift in external data
+BIAS_EXT = 0.3      # Mean shift in external data
 BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 CORR = 0.3
 
@@ -120,11 +120,11 @@ PIPELINES = [
             design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=500),
             estimator=EnergyMatchingEstimator()
         ),
-        MethodPipeline(
-            name="EnergyMatching_999",
-            design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=999),
-            estimator=EnergyMatchingEstimator()
-        ),
+        # MethodPipeline(
+        #     name="EnergyMatching_999",
+        #     design=FixedRatioDesign(treat_ratio=0.5, target_n_aug=999),
+        #     estimator=EnergyMatchingEstimator()
+        # ),
     ]
 # ----------------------
 
@@ -170,9 +170,17 @@ def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_
 
     results = {}
     
+    # Generate a specific seed for splitting to ensure consistency across methods
+    # We use a large integer derived from the main rng
+    split_seed = rng.integers(0, 2**63 - 1)
+    
     for pipe in pipelines:
+        # Create a fresh RNG for this split call to ensure identical splitting behavior
+        # across all pipelines (provided the design parameters like ratio are compatible).
+        split_rng = np.random.default_rng(split_seed)
+        
         # split
-        split_data = pipe.design.split(rct_data, ext_data)
+        split_data = pipe.design.split(rct_data, ext_data, rng=split_rng)
         # estimate
         res = pipe.estimator.estimate(split_data)
         results[pipe.name] = res

@@ -1,3 +1,4 @@
+from typing import Optional
 import numpy as np
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.preprocessing import StandardScaler
@@ -71,7 +72,9 @@ class IPWBalanceDesign(BaseDesign):
         
         return int(min(n_effective, n_ext))
 
-    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes) -> SplitData:
+    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes, rng: Optional[np.random.Generator] = None) -> SplitData:
+        local_rng = rng if rng is not None else np.random.default_rng()
+        
         # 1. Estimate Effective N based on compatibility (IPW)
         best_n_aug = self._estimate_effective_sample_size(rct_pool.X, ext_pool.X)
         
@@ -87,7 +90,7 @@ class IPWBalanceDesign(BaseDesign):
         # Safety bounds
         n_treat = min(max(n_treat, 10), n_rct - 10)
 
-        indices = np.random.permutation(n_rct)
+        indices = local_rng.permutation(n_rct)
         idx_t = indices[:n_treat]
         idx_c = indices[n_treat:]
         

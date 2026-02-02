@@ -1,3 +1,4 @@
+from typing import Optional
 import numpy as np
 from structures import PotentialOutcomes, SplitData
 from .base import BaseDesign
@@ -7,15 +8,22 @@ class FixedRatioDesign(BaseDesign):
     A design that splits the RCT data according to a fixed ratio (e.g., 1:1)
     and targets a pre-determined fixed number of external samples.
     """
-    def __init__(self, treat_ratio=0.5, target_n_aug=100):
+    def __init__(self, treat_ratio=0.5, target_n_aug=100, seed_split=None):
         self.treat_ratio = treat_ratio
         self.target_n_aug = target_n_aug
+        if seed_split is not None:
+            self.rng = np.random.default_rng(seed_split)
+        else:
+            self.rng = np.random.default_rng()
 
-    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes) -> SplitData:
+    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes, rng: Optional[np.random.Generator] = None) -> SplitData:
         n_rct = rct_pool.X.shape[0]
         n_treat = int(n_rct * self.treat_ratio)
+
+        # Use provided rng if available, else use internal
+        local_rng = rng if rng is not None else self.rng
         
-        indices = np.random.permutation(n_rct)
+        indices = local_rng.permutation(n_rct)
         idx_t = indices[:n_treat]
         idx_c = indices[n_treat:]
 

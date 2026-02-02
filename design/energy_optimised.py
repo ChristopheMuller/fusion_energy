@@ -1,3 +1,4 @@
+from typing import Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -40,7 +41,7 @@ class EnergyOptimisedDesign(BaseDesign):
             
         self.target_n_aug = None
 
-    def _estimate_optimal_augmentation(self, X_rct, X_ext):
+    def _estimate_optimal_augmentation(self, X_rct, X_ext, rng: np.random.Generator):
         n_rct = X_rct.shape[0]
         optimal_ns = []
         X_ext_torch = torch.tensor(X_ext, dtype=torch.float32, device=self.device)
@@ -50,7 +51,7 @@ class EnergyOptimisedDesign(BaseDesign):
         
         for fold in range(self.k_folds):
             # 1. Split RCT 1:1 into "Simulated Target" and "Simulated Internal"
-            indices = np.random.permutation(n_rct)
+            indices = rng.permutation(n_rct)
             n_treat_sim = n_rct // 2
             
             X_t_sim = torch.tensor(X_rct[indices[:n_treat_sim]], dtype=torch.float32, device=self.device)
@@ -123,8 +124,10 @@ class EnergyOptimisedDesign(BaseDesign):
         scores = [get_score(n) for n in candidates]
         return candidates[np.argmin(scores)]
 
-    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes) -> SplitData:
-        best_n_aug = self._estimate_optimal_augmentation(rct_pool.X, ext_pool.X)
+    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes, rng: Optional[np.random.Generator] = None) -> SplitData:
+        local_rng = rng if rng is not None else np.random.default_rng()
+        
+        best_n_aug = self._estimate_optimal_augmentation(rct_pool.X, ext_pool.X, local_rng)
         self.target_n_aug = best_n_aug
         n_rct = rct_pool.X.shape[0]
         
@@ -136,7 +139,7 @@ class EnergyOptimisedDesign(BaseDesign):
         # Safety bounds
         n_treat = min(max(n_treat, 10), n_rct - 10)
 
-        indices = np.random.permutation(n_rct)
+        indices = local_rng.permutation(n_rct)
         idx_t = indices[:n_treat]
         idx_c = indices[n_treat:]
         

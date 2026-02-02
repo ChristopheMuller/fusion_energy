@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 from structures import PotentialOutcomes, SplitData
+import numpy as np
 
 class BaseDesign(ABC):
     """
@@ -11,7 +13,7 @@ class BaseDesign(ABC):
     """
     
     @abstractmethod
-    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes) -> SplitData:
+    def split(self, rct_pool: PotentialOutcomes, ext_pool: PotentialOutcomes, rng: Optional[np.random.Generator] = None) -> SplitData:
         """
         Splits the RCT pool into Treatment and Internal Control, and determines
         the target augmentation size.
@@ -19,6 +21,7 @@ class BaseDesign(ABC):
         Args:
             rct_pool: PotentialOutcomes object containing RCT covariates and hidden outcomes.
             ext_pool: PotentialOutcomes object containing External covariates and outcomes.
+            rng: Optional numpy Generator for reproducible splitting.
             
         Returns:
             SplitData: Object containing the specific subsets to be used for estimation.
