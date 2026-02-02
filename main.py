@@ -241,13 +241,13 @@ def run_monte_carlo(n_sims=100):
     
     # Generate one example dataset (using a fixed seed for consistency in plots)
     np.random.seed(42)
-    rng_plot = np.random.default_rng(42)
     gen = DataGenerator(dim=DIM, beta=beta_fixed)
     
     rct_data_plot = gen.generate_rct_pool(n=N_RCT, mean=MEAN_RCT, var=VAR_RCT, corr=CORR, treatment_effect=TREATMENT_EFFECT)
     ext_data_plot = gen.generate_external_pool(n=N_EXT, mean=MEAN_RCT-BIAS_EXT, var=VAR_EXT, corr=CORR, beta_bias=BETA_BIAS_EXT)
     
     for pipe in PIPELINES:
+        rng_plot = np.random.default_rng(42)
         split_data = pipe.design.split(rct_data_plot, ext_data_plot, rng=rng_plot)
         est_result = pipe.estimator.estimate(split_data)
         
