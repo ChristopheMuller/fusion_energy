@@ -63,3 +63,9 @@ This project is managed with `uv`, a fast Python package manager.
     ```bash
     uv run main.py
     ```
+
+### Testing
+Run the test suite using `pytest`:
+```bash
+PYTHONPATH=. uv run pytest
+```
