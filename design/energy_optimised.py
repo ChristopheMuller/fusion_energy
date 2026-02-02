@@ -83,16 +83,15 @@ class EnergyOptimisedDesign(BaseDesign):
     def _evaluate_n_energy(self, n, logits, X_t, X_c, X_e):
         if n == 0: return 9999.0
         
-        # 1. Sample Indices
-        probs = F.softmax(logits, dim=0).cpu().numpy()
-        probs /= probs.sum()
-        pool_idx = np.arange(len(probs))
-        
-        batch_indices = [
-            np.random.choice(pool_idx, size=n, replace=False, p=probs)
-            for _ in range(self.k_best)
-        ]
-        batch_idx = torch.tensor(np.array(batch_indices), device=self.device, dtype=torch.long)
+        # 1. Sample Indices (Optimised)
+        probs = F.softmax(logits, dim=0)
+        # torch.multinomial is significantly faster than a loop of np.random.choice
+        # and keeps computations on the device.
+        batch_idx = torch.multinomial(
+            probs.expand(self.k_best, -1),
+            num_samples=n,
+            replacement=False
+        )
         
         # 2. Compute Energy (Batch Mode)
         X_aug = X_e[batch_idx] 
