@@ -18,18 +18,18 @@ from visualisations import (
 )
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 150
+N_SIMS = 100
 DIM = 3
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
 
-VAR_EXT = 1.0
+VAR_EXT = 3.
 BIAS_EXT = 0.3      # Mean shift in external data
 BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 CORR = 0.3
 
-N_RCT = 200
+N_RCT = 100
 N_EXT = 1500
 
 # -------------------------
@@ -104,62 +104,6 @@ PIPELINES = [
         MethodPipeline(
             name="EnergyMatching_100",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=100),
-            estimator=EnergyMatchingEstimator()
-        ),
-
-        MethodPipeline(
-            name="EnergyMatching_0_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=0),
-            estimator=DummyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_5_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=5),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_7_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=7),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_10_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=10),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_15_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=15),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_20_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=20),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_30_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=30),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_40_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=40),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_50_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=50),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_75_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=75),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_100_post",
-            design=FixedRatioDesign(treat_ratio_post=0.5, target_n_aug=100),
             estimator=EnergyMatchingEstimator()
         ),
     ]

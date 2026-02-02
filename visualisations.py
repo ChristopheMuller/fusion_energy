@@ -295,22 +295,29 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
     
     df = pd.DataFrame(data).sort_values("Avg_N_Ext")
     
-    plt.figure(figsize=(12, 8))
+    fig, ax1 = plt.subplots(figsize=(12, 8))
     
-    # Plot lines
-    plt.plot(df["Avg_N_Ext"], df["Squared Bias"], marker='o', label='Bias^2', color='salmon')
-    plt.plot(df["Avg_N_Ext"], df["Variance"], marker='s', label='Variance', color='skyblue')
-    plt.plot(df["Avg_N_Ext"], df["MSE"], marker='d', label='MSE', color='green', linewidth=2)
-    plt.plot(df["Avg_N_Ext"], df["Energy"], marker='x', label='Energy Distance', color='mediumpurple', linestyle='--')
+    # Plot MSE components on left axis
+    ax1.plot(df["Avg_N_Ext"], df["Squared Bias"], marker='o', label='Bias^2', color='salmon')
+    ax1.plot(df["Avg_N_Ext"], df["Variance"], marker='s', label='Variance', color='skyblue')
+    ax1.plot(df["Avg_N_Ext"], df["MSE"], marker='d', label='MSE', color='green', linewidth=2)
     
-    plt.xlabel('Average External Data Points (Sum of weights)')
-    plt.ylabel('Value')
+    ax1.set_xlabel('Average External Data Points (Sum of weights)')
+    ax1.set_ylabel('MSE Metrics')
+    ax1.grid(True, linestyle='--', alpha=0.5)
+    
+    # Create twin axis for Energy Distance
+    ax2 = ax1.twinx()
+    ax2.plot(df["Avg_N_Ext"], df["Energy"], marker='x', label='Energy Distance', color='mediumpurple', linestyle='--')
+    ax2.set_ylabel('Energy Distance', color='mediumpurple')
+    ax2.tick_params(axis='y', labelcolor='mediumpurple')
+    
     plt.title('Performance Metrics vs. External Data Sample Size')
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.5)
     
-    # Optional: Log scale if values vary widely
-    # plt.yscale('log')
+    # Unified legend
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
     
     plt.tight_layout()
     
