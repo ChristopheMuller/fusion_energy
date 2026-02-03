@@ -30,6 +30,20 @@ class DataGenerator:
 
         current_beta = self.beta if beta_bias is None else self.beta + beta_bias
         y0 = X @ current_beta + np.random.normal(0, 0.5, n)
+
+        # # make a very non-linear outcome (assume big dimension):
+        # y0 = np.zeros(n)
+        # for d in range(self.dim):
+        #     if d % 4 == 0:
+        #         y0 += 3*np.sin(X[:, d])
+        #     elif d % 4 == 1:
+        #         y0 += 2*np.log(np.abs(X[:, d]) + 1)
+        #     elif d % 4 == 2:
+        #         y0 += 0.5 * X[:, d] ** 2
+        #     else:
+        #         y0 += 1.5 * X[:, d]
+        # y0 += np.random.normal(0, 0.5, n)
+
         y1 = y0 + treatment_effect
         return y0, y1
 

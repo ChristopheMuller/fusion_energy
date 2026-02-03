@@ -20,18 +20,18 @@ from visualisations import (
 
 # ----- GLOBAL CONFIG ----- 
 N_SIMS = 100
-DIM = 3
+DIM = 5
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
-
-VAR_EXT = 1.5
-BIAS_EXT = 1.3      # Mean shift in external data
-BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 CORR = 0.3
 
-N_RCT = 100
-N_EXT = 500
+VAR_EXT = 1.5
+BIAS_EXT = 0.7      # Mean shift in external data
+BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
+
+N_RCT = 200
+N_EXT = 1000
 
 # -------------------------
 
@@ -100,6 +100,16 @@ PIPELINES = [
         MethodPipeline(
             name="EnergyMatching_100",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=100),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_150",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=150),
+            estimator=EnergyMatchingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyMatching_200",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=200),
             estimator=EnergyMatchingEstimator()
         ),
     ]
