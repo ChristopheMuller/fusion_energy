@@ -63,6 +63,6 @@ class IPWEstimator(BaseEstimator):
         return EstimationResult(
             ate_est=ate,
             bias=ate - data.true_sate,
-            weights_continuous=w_int,
+            weights_continuous=scores_ext,
             weights_external=w_ext
         )

@@ -20,7 +20,7 @@ from visualisations import (
 
 # ----- GLOBAL CONFIG ----- 
 N_SIMS = 100
-DIM = 5
+DIM = 2
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
@@ -63,13 +63,8 @@ PIPELINES = [
             estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
         ),
         MethodPipeline(
-            name="IPW_50",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=50),
-            estimator=IPWEstimator()
-        ),
-        MethodPipeline(
-            name="IPW_100",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=100),
+            name="IPW",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=0),
             estimator=IPWEstimator()
         ),
         MethodPipeline(
