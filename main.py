@@ -4,7 +4,7 @@ from joblib import Parallel, delayed
 from structures import EstimationResult
 from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer, IPWBalanceDesign
-from estimator import IPWEstimator, EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator
+from estimator import IPWEstimator, EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
@@ -53,64 +53,29 @@ class MethodPipeline:
 
 PIPELINES = [
         MethodPipeline(
-            name="EnergyMatching_0",
+            name="EnergyMatching_NoExt",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=0),
             estimator=DummyMatchingEstimator()
         ),
         MethodPipeline(
-            name="EnergyMatching_5",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=5),
-            estimator=EnergyMatchingEstimator()
+            name="EnergyMatching_OPT_Estimator",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
         ),
         MethodPipeline(
-            name="EnergyMatching_10",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=10),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_15",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=15),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_20",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=20),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_30",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=30),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_40",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=40),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_50",
+            name="IPW_50",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=50),
-            estimator=EnergyMatchingEstimator()
+            estimator=IPWEstimator()
         ),
         MethodPipeline(
-            name="EnergyMatching_75",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=75),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_100",
+            name="IPW_100",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=100),
-            estimator=EnergyMatchingEstimator()
+            estimator=IPWEstimator()
         ),
         MethodPipeline(
-            name="EnergyMatching_150",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=150),
-            estimator=EnergyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="EnergyMatching_200",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=200),
-            estimator=EnergyMatchingEstimator()
+            name="EnergyMatching_OPT_Design_Estimator",
+            design=EnergyOptimisedDesign(),
+            estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
         ),
     ]
 # ----------------------

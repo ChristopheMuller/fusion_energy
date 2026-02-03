@@ -33,7 +33,7 @@ class OptimalEnergyMatchingEstimator(BaseEstimator):
 
     def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
         """
-        Iterates n_ext from 0 to max_external (step size) and finds the best.
+        Iterates n_ext from 0 to max_external (step size) and finds the best using ternary search.
         Ignores the `n_external` argument if passed, as this estimator optimizes it.
         """
         
@@ -49,24 +49,52 @@ class OptimalEnergyMatchingEstimator(BaseEstimator):
         if candidates[-1] != limit:
             candidates.append(limit)
             
+        memo = {}
+
+        def get_energy(idx):
+            n = candidates[idx]
+            if n in memo:
+                return memo[n][0]
+            
+            try:
+                res = self.matcher.estimate(data, n_external=n)
+                energy = res.energy_distance
+                memo[n] = (energy, res)
+                return energy
+            except Exception as e:
+                print(f"Warning: EnergyMatchingEstimator failed for n_external={n}: {e}")
+                return float('inf')
+
+        # Ternary Search for U-shaped energy curve
+        left = 0
+        right = len(candidates) - 1
+        
+        while right - left > 2:
+            m1 = left + (right - left) // 3
+            m2 = right - (right - left) // 3
+            e1 = get_energy(m1)
+            e2 = get_energy(m2)
+            
+            if e1 < e2:
+                right = m2
+            else:
+                left = m1
+                
         best_result = None
         min_energy = float('inf')
         
-        for n in candidates:
-            # We assume n_external=0 works and returns the baseline energy of using only internal controls
-            try:
-                res = self.matcher.estimate(data, n_external=n)
+        for i in range(left, right + 1):
+            n = candidates[i]
+            # Ensure computed
+            if n not in memo:
+                get_energy(i)
                 
-                # Check energy
-                if res.energy_distance < min_energy:
-                    min_energy = res.energy_distance
+            if n in memo:
+                energy, res = memo[n]
+                if energy < min_energy:
+                    min_energy = energy
                     best_result = res
-            except Exception as e:
-                # If n=0 or some other case fails, we log or ignore? 
-                # Ideally it shouldn't fail. 
-                print(f"Warning: EnergyMatchingEstimator failed for n_external={n}: {e}")
-                continue
-                
+            
         if best_result is None:
             raise RuntimeError("Could not find any valid estimation result.")
             
