@@ -55,7 +55,7 @@ class EnergyMatchingEstimator(BaseEstimator):
         
         # 3. Select Best Sample (Stochastic Selection)
         # We pick the specific binary subset that minimizes energy
-        best_indices = self._select_best_sample(X_t, X_c, X_e, probs, target_n)
+        best_indices, min_energy = self._select_best_sample(X_t, X_c, X_e, probs, target_n)
         
         # 4. Construct Estimation Result
         w_ext = np.zeros(n_ext)
@@ -70,7 +70,8 @@ class EnergyMatchingEstimator(BaseEstimator):
             ate_est=ate,
             bias=ate - data.true_sate,
             weights_continuous=w_int,
-            weights_external=w_ext
+            weights_external=w_ext,
+            energy_distance=min_energy
         )
 
     def _select_best_sample(self, X_t, X_c, X_e, probs, n_sampled):
@@ -96,4 +97,5 @@ class EnergyMatchingEstimator(BaseEstimator):
         
         # D. Pick Best
         best_k_idx = torch.argmin(energies).item()
-        return batch_indices[best_k_idx]
+        min_energy = energies[best_k_idx].item()
+        return batch_indices[best_k_idx], min_energy

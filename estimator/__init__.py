@@ -15,11 +15,13 @@ from .ipw import IPWEstimator
 from .energy_matching import EnergyMatchingEstimator
 from .dummy import DummyMatchingEstimator
 from .energy_weighting import EnergyWeightingEstimator
+from .optimal_energy_matching import OptimalEnergyMatchingEstimator
 
 __all__ = [
     "BaseEstimator",
     "IPWEstimator",
     "EnergyMatchingEstimator",
     "DummyMatchingEstimator",
-    "EnergyWeightingEstimator"
+    "EnergyWeightingEstimator",
+    "OptimalEnergyMatchingEstimator"
 ]

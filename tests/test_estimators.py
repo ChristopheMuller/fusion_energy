@@ -5,7 +5,8 @@ from estimator import (
     IPWEstimator,
     EnergyMatchingEstimator,
     EnergyWeightingEstimator,
-    DummyMatchingEstimator
+    DummyMatchingEstimator,
+    OptimalEnergyMatchingEstimator
 )
 
 def verify_estimation_result(res: EstimationResult, n_int: int, n_ext: int):
@@ -24,6 +25,18 @@ def test_energy_matching_estimator(split_data):
     est = EnergyMatchingEstimator(n_iter=10, k_best=5)
     res = est.estimate(split_data)
     verify_estimation_result(res, len(split_data.X_control_int), len(split_data.X_external))
+    assert res.energy_distance is not None
+
+def test_optimal_energy_matching_estimator(split_data):
+    # Set max_external small to be faster
+    n_ext_total = split_data.X_external.shape[0]
+    est = OptimalEnergyMatchingEstimator(max_external=min(10, n_ext_total), step=2, n_iter=10, k_best=5)
+    res = est.estimate(split_data)
+    verify_estimation_result(res, len(split_data.X_control_int), len(split_data.X_external))
+    assert res.energy_distance is not None
+    # Check that n_external_used is one of the candidates (0, 2, 4, ..., or max)
+    # The actual used might be 0 if that's optimal
+    assert res.n_external_used() in range(0, min(10, n_ext_total) + 1)
 
 def test_energy_weighting_estimator(split_data):
     est = EnergyWeightingEstimator(n_iter=10)
