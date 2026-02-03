@@ -135,11 +135,13 @@ class SimLog:
             "Check (Bias^2+Var)": bias**2 + variance
         }
 
-def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, corr, treatment_effect, pipelines):
+def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, corr, treatment_effect, pipelines):
     """Runs a single iteration of the simulation."""
     # Ensure independent randomness per process
     rng = np.random.default_rng(seed)
     np.random.seed(seed) 
+
+    beta = rng.uniform(1, 3, dim)
 
     gen = DataGenerator(dim=dim, beta=beta)
     
@@ -175,22 +177,20 @@ def run_single_simulation(seed, dim, beta, n_rct, n_ext, mean_rct, var_rct, var_
     
     return results
 
-def run_monte_carlo(n_sims=100):
-
-    beta_fixed = np.ones(DIM)
+def run_monte_carlo(n_sims=100, seed=None):
         
     logs = {p.name: SimLog() for p in PIPELINES}
 
     print(f"Starting simulation with {n_sims} iterations (Parallel)...")
 
     # Generate seeds for reproducibility
-    seeds = np.random.randint(0, 1000000, size=n_sims)
+    rng = np.random.default_rng(seed)
+    seeds = rng.integers(0, 1000000, size=n_sims)
 
     parallel_results = Parallel(n_jobs=10, verbose=5)(
         delayed(run_single_simulation)(
             seed=seed,
             dim=DIM,
-            beta=beta_fixed,
             n_rct=N_RCT,
             n_ext=N_EXT,
             mean_rct=MEAN_RCT,
@@ -232,6 +232,7 @@ def run_monte_carlo(n_sims=100):
     
     # Generate one example dataset (using a fixed seed for consistency in plots)
     np.random.seed(42)
+    beta_fixed = np.ones(DIM)
     gen = DataGenerator(dim=DIM, beta=beta_fixed)
     
     rct_data_plot = gen.generate_rct_pool(n=N_RCT, mean=MEAN_RCT, var=VAR_RCT, corr=CORR, treatment_effect=TREATMENT_EFFECT)
@@ -251,4 +252,4 @@ def run_monte_carlo(n_sims=100):
 
 
 if __name__ == "__main__":
-    run_monte_carlo(n_sims=N_SIMS)
+    run_monte_carlo(n_sims=N_SIMS, seed=1234)
