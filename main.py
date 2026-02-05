@@ -4,7 +4,7 @@ from joblib import Parallel, delayed
 from structures import EstimationResult
 from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer
-from estimator import EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator
+from estimator import EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator, IPWEstimator, EnergyPooledWeightingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
@@ -27,7 +27,7 @@ VAR_RCT = 1.0
 CORR = 0.3
 
 VAR_EXT = 1.5
-BIAS_EXT = 0.7      # Mean shift in external data
+BIAS_EXT = 1      # Mean shift in external data
 BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 
 N_RCT = 200
@@ -67,6 +67,21 @@ PIPELINES = [
             design=EnergyOptimisedDesign(),
             estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
         ),
+        MethodPipeline(
+            name="IPW_weighting",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=IPWEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyWeighting",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=EnergyWeightingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyPooledWeighting",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=EnergyPooledWeightingEstimator()
+        )
     ]
 # ----------------------
 

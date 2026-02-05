@@ -15,6 +15,7 @@ from .dummy import DummyMatchingEstimator
 from .energy_weighting import EnergyWeightingEstimator
 from .optimal_energy_matching import OptimalEnergyMatchingEstimator
 from .ipw import IPWEstimator
+from .energy_pooled_weighting import EnergyPooledWeightingEstimator
 
 __all__ = [
     "BaseEstimator",
@@ -23,4 +24,5 @@ __all__ = [
     "EnergyWeightingEstimator",
     "OptimalEnergyMatchingEstimator",
     "IPWEstimator",
+    "EnergyPooledWeightingEstimator",
 ]
