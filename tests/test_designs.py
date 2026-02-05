@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from structures import SplitData
-from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer, IPSWBalanceDesign
+from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer
 
 def verify_split_data(split_data: SplitData, n_rct: int, n_ext: int):
     assert isinstance(split_data, SplitData)
@@ -38,9 +38,3 @@ def test_pooled_energy_minimizer(rct_pool, ext_pool):
     n_ext = ext_pool.X.shape[0]
     verify_split_data(split_data, n_rct, n_ext)
 
-def test_ipw_balance_design(rct_pool, ext_pool):
-    design = IPSWBalanceDesign(cv=2, max_iter=50)
-    split_data = design.split(rct_pool, ext_pool)
-    n_rct = rct_pool.X.shape[0]
-    n_ext = ext_pool.X.shape[0]
-    verify_split_data(split_data, n_rct, n_ext)

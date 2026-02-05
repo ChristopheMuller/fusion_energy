@@ -3,8 +3,8 @@ import pandas as pd
 from joblib import Parallel, delayed
 from structures import EstimationResult
 from generators import DataGenerator
-from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer, IPSWBalanceDesign
-from estimator import IPSWEstimator, EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator
+from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer
+from estimator import EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
@@ -56,11 +56,6 @@ PIPELINES = [
             name="EnergyMatching_NoExt",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=0),
             estimator=DummyMatchingEstimator()
-        ),
-        MethodPipeline(
-            name="IPW",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=0),
-            estimator=IPSWEstimator()
         ),
         MethodPipeline(
             name="EnergyMatching_OPT_Estimator",

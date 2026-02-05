@@ -15,12 +15,10 @@ from .base import BaseDesign
 from .fixed_ratio import FixedRatioDesign
 from .energy_optimised import EnergyOptimisedDesign
 from .pooled_energy import PooledEnergyMinimizer
-from .ipsw_balance import IPSWBalanceDesign
 
 __all__ = [
     "BaseDesign",
     "FixedRatioDesign",
     "EnergyOptimisedDesign",
     "PooledEnergyMinimizer",
-    "IPSWBalanceDesign"
 ]

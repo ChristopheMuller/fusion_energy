@@ -2,7 +2,6 @@ import pytest
 import numpy as np
 from structures import EstimationResult
 from estimator import (
-    IPSWEstimator,
     EnergyMatchingEstimator,
     EnergyWeightingEstimator,
     DummyMatchingEstimator,
@@ -15,11 +14,6 @@ def verify_estimation_result(res: EstimationResult, n_int: int, n_ext: int):
     # The current implementation seems to return weights of size n_ext for both internal and external
     assert len(res.weights_continuous) == n_ext
     assert len(res.weights_external) == n_ext
-
-def test_ipw_estimator(split_data):
-    est = IPSWEstimator(cv=2, max_iter=50)
-    res = est.estimate(split_data)
-    verify_estimation_result(res, len(split_data.X_control_int), len(split_data.X_external))
 
 def test_energy_matching_estimator(split_data):
     est = EnergyMatchingEstimator(n_iter=10, k_best=5)
