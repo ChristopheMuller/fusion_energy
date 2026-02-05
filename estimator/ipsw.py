@@ -5,7 +5,7 @@ from sklearn.pipeline import make_pipeline
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
 
-class IPWEstimator(BaseEstimator):
+class IPSWEstimator(BaseEstimator):
     def __init__(self, 
                  clip_min: float = 0.001, 
                  clip_max: float = 0.999, 
