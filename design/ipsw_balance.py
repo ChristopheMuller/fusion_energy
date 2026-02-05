@@ -7,7 +7,7 @@ from sklearn.pipeline import make_pipeline
 from structures import PotentialOutcomes, SplitData
 from .base import BaseDesign
 
-class IPWBalanceDesign(BaseDesign):
+class IPSWBalanceDesign(BaseDesign):
     """
     Determines the augmentation size (N_aug) by calculating the sum of 
     propensity score weights (Effective Sample Size) of the external data.
