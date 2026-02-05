@@ -27,7 +27,7 @@ VAR_RCT = 1.0
 CORR = 0.3
 
 VAR_EXT = 1.5
-BIAS_EXT = 1      # Mean shift in external data
+BIAS_EXT = 0.7      # Mean shift in external data
 BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 
 N_RCT = 200
