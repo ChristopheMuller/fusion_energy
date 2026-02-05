@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from structures import SplitData
-from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer
+from design import FixedRatioDesign, EnergyOptimisedDesign
 
 def verify_split_data(split_data: SplitData, n_rct: int, n_ext: int):
     assert isinstance(split_data, SplitData)
@@ -25,14 +25,6 @@ def test_fixed_ratio_design(rct_pool, ext_pool):
 def test_energy_optimised_design(rct_pool, ext_pool):
     # Reduced iterations for faster testing
     design = EnergyOptimisedDesign(k_folds=2, n_iter=10, k_best=5, n_max=20)
-    split_data = design.split(rct_pool, ext_pool)
-    n_rct = rct_pool.X.shape[0]
-    n_ext = ext_pool.X.shape[0]
-    verify_split_data(split_data, n_rct, n_ext)
-
-def test_pooled_energy_minimizer(rct_pool, ext_pool):
-    # Reduced iterations for faster testing
-    design = PooledEnergyMinimizer(k_best=5, n_iter=10, n_max=20)
     split_data = design.split(rct_pool, ext_pool)
     n_rct = rct_pool.X.shape[0]
     n_ext = ext_pool.X.shape[0]

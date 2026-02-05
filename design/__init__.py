@@ -8,17 +8,14 @@ This module provides strategies to determining:
 Classes:
 - FixedRatioDesign: Standard fixed allocation (e.g., 1:1).
 - EnergyOptimisedDesign: Optimises N_aug based on energy distance between Target and Augmented Control.
-- PooledEnergyMinimizer: Optimises N_aug based on energy distance between Pooled RCT and External data.
 """
 
 from .base import BaseDesign
 from .fixed_ratio import FixedRatioDesign
 from .energy_optimised import EnergyOptimisedDesign
-from .pooled_energy import PooledEnergyMinimizer
 
 __all__ = [
     "BaseDesign",
     "FixedRatioDesign",
-    "EnergyOptimisedDesign",
-    "PooledEnergyMinimizer",
+    "EnergyOptimisedDesign"
 ]

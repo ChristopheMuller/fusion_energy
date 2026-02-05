@@ -3,7 +3,7 @@ import pandas as pd
 from joblib import Parallel, delayed
 from structures import EstimationResult
 from generators import DataGenerator
-from design import FixedRatioDesign, EnergyOptimisedDesign, PooledEnergyMinimizer
+from design import FixedRatioDesign, EnergyOptimisedDesign
 from estimator import EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator, IPWEstimator, EnergyPooledWeightingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
@@ -20,7 +20,7 @@ from visualisations import (
 
 # ----- GLOBAL CONFIG ----- 
 N_SIMS = 100
-DIM = 2
+DIM = 5
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
@@ -62,11 +62,11 @@ PIPELINES = [
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
             estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
         ),
-        MethodPipeline(
-            name="EnergyMatching_OPT_Design_Estimator",
-            design=EnergyOptimisedDesign(),
-            estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
-        ),
+        # MethodPipeline(
+        #     name="EnergyMatching_OPT_Design_Estimator",
+        #     design=EnergyOptimisedDesign(),
+        #     estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
+        # ),
         MethodPipeline(
             name="IPW_weighting",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
