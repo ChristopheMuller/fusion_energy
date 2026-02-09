@@ -87,9 +87,9 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
         d_pooled_pooled = torch.cdist(X_pooled_control, X_pooled_control, p=2)
         d_treat_treat = torch.cdist(X_treat, X_treat, p=2)
         
-        d_control_external = torch.cdist(m_control_int, m_external, p=2)
-        d_control_control = torch.cdist(m_control_int, m_control_int, p=2)
-        d_external_external = torch.cdist(m_external, m_external, p=2)
+        d_m_control_external = torch.cdist(m_control_int, m_external, p=2)
+        d_m_control_control = torch.cdist(m_control_int, m_control_int, p=2)
+        d_m_external_external = torch.cdist(m_external, m_external, p=2)
         
         n_treat = X_treat.shape[0]
         w_treat_uniform = torch.ones(n_treat, device=self.device) / n_treat
@@ -118,11 +118,10 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
             
             # Using w_control_uniform for both ensures we see the 'uniform' imbalance
             original_prog_loss = self._energy_distance_precomputed(
-                d_control_external, d_control_control, d_external_external,
+                d_m_control_external, d_m_control_control, d_m_external_external,
                 w_control_uniform, torch.ones(m_external.shape[0], device=self.device) / m_external.shape[0]
             ).item()
         
-        # Use a slightly safer epsilon or max(val, 1e-10)
         s_cov = max(original_cov_loss, 1e-10)
         s_prog = max(original_prog_loss, 1e-10)
         
@@ -141,7 +140,7 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
             )
             
             loss_prog = self._energy_distance_precomputed(
-                d_control_external, d_control_control, d_external_external,
+                d_m_control_external, d_m_control_control, d_m_external_external,
                 w_control_uniform, w_ext_norm
             )
 
