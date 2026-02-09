@@ -36,12 +36,11 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
         return int(dim)
 
     def _energy_distance_precomputed(self, d_XY, d_XX, d_YY, w1, w2):
-        term1 = 2 * torch.sum(w1.unsqueeze(1) * w2.unsqueeze(0) * d_XY)
-        term2 = torch.sum(w1.unsqueeze(1) * w1.unsqueeze(0) * d_XX)
-        term3 = torch.sum(w2.unsqueeze(1) * w2.unsqueeze(0) * d_YY)
-        
-        return term1 - term2 - term3
-    
+        term1 = 2 * torch.dot(w1, torch.mv(d_XY, w2))
+        term2 = torch.dot(w1, torch.mv(d_XX, w1))
+        term3 = torch.dot(w2, torch.mv(d_YY, w2))
+        return term1 - term2 - term3    
+
     def _train_prognostic_model(self, X_ext, Y_ext):
         X_np = X_ext.detach().cpu().numpy()
         Y_np = Y_ext.detach().cpu().numpy().ravel()
