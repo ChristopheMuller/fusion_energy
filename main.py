@@ -16,11 +16,12 @@ from visualisations import (
     plot_mse_decomposition, 
     plot_energy_distance,
     plot_metric_curves,
-    plot_weight_ranks
+    plot_weight_ranks,
+    plot_estimation_time
 )
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 100
+N_SIMS = 50
 DIM = 5
 
 MEAN_RCT = np.ones(DIM)
@@ -32,7 +33,7 @@ BIAS_EXT = 0.7      # Mean shift in external data
 BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 
 N_RCT = 200
-N_EXT = 500
+N_EXT = 1000
 
 # -------------------------
 
@@ -71,22 +72,22 @@ PIPELINES = [
         MethodPipeline(
             name="EnergyWeighting",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyWeightingEstimator()
+            estimator=EnergyWeightingEstimator(n_iter=1000)
         ),
         MethodPipeline(
-            name="PrognosticEnergyWeighting_0L",
+            name="PrognosticEnergyWeighting_03L",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=PrognosticEnergyWeightingEstimator(lamb=0)
-        ),
-        MethodPipeline(
-            name="PrognosticEnergyWeighting_01L",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=PrognosticEnergyWeightingEstimator(lamb=0.1)
+            estimator=PrognosticEnergyWeightingEstimator(lamb=0.3, n_iter_weights=1000, verbose=False)
         ),
         MethodPipeline(
             name="PrognosticEnergyWeighting_05L",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=PrognosticEnergyWeightingEstimator(lamb=0.5)
+            estimator=PrognosticEnergyWeightingEstimator(lamb=0.5, n_iter_weights=1000)
+        ),
+        MethodPipeline(
+            name="PrognosticEnergyWeighting_10L",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=PrognosticEnergyWeightingEstimator(lamb=10, n_iter_weights=1000)
         ),
     ]
 # ----------------------
@@ -212,6 +213,7 @@ def run_monte_carlo(n_sims=100, seed=None):
     plot_mse_decomposition(logs)
     plot_energy_distance(logs)
     plot_metric_curves(logs)
+    plot_estimation_time(logs)
 
     # Visualisations of example data
     print("Generating PCA plots...")

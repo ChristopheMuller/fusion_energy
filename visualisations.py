@@ -372,3 +372,34 @@ def plot_weight_ranks(est_result, title, filename, n_external=None):
     plt.savefig(filename)
     plt.close()
     print(f"Saved weight rank plot to {filename}")
+
+def plot_estimation_time(logs: Dict[str, Any], filename="plots/estimation_time.png"):
+    """
+    Generates a bar plot of average estimation time with confidence intervals for each method.
+    
+    Args:
+        logs: Dictionary mapping method names to SimLog objects.
+        filename: Path to save the plot.
+    """
+    data = []
+    for method_name, log in logs.items():
+        for res in log.results:
+            data.append({
+                "Method": method_name,
+                "Estimation Time (s)": res.estimation_time
+            })
+    
+    df = pd.DataFrame(data)
+    
+    plt.figure(figsize=(12, 8))
+    sns.barplot(data=df, x="Method", y="Estimation Time (s)", capsize=.2)
+    
+    plt.title("Average Estimation Time per Method")
+    plt.xticks(rotation=45, ha='right')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    plt.savefig(filename)
+    plt.close()
+    print(f"Saved estimation time plot to {filename}")
