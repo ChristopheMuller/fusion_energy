@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+import time
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
 
@@ -12,6 +13,7 @@ class EnergyWeightingEstimator(BaseEstimator):
         self.device = device if device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
+        start_time = time.time()
         n_int = data.X_control_int.shape[0]
         n_t = data.X_treat.shape[0]
         
@@ -61,5 +63,6 @@ class EnergyWeightingEstimator(BaseEstimator):
             bias=ate - data.true_sate,
             weights_continuous=w_ext,
             weights_external=w_ext * n_pool,
-            energy_distance=prev_loss
+            energy_distance=prev_loss,
+            estimation_time=time.time() - start_time
         )

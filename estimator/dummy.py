@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
 
@@ -16,6 +17,7 @@ class DummyMatchingEstimator(BaseEstimator):
         self.seed = seed
 
     def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
+        start_time = time.time()
         rng = np.random.default_rng(self.seed)
         
         n_int = data.X_control_int.shape[0]
@@ -38,7 +40,8 @@ class DummyMatchingEstimator(BaseEstimator):
                 ate_est=ate,
                 bias=ate - data.true_sate,
                 weights_continuous=np.ones(n_ext),
-                weights_external=np.zeros(n_ext)
+                weights_external=np.zeros(n_ext),
+                estimation_time=time.time() - start_time
             )
         
         # Case 2: Select Random Subset
@@ -66,5 +69,6 @@ class DummyMatchingEstimator(BaseEstimator):
             ate_est=ate,
             bias=ate - data.true_sate,
             weights_continuous=w_int,
-            weights_external=w_ext
+            weights_external=w_ext,
+            estimation_time=time.time() - start_time
         )

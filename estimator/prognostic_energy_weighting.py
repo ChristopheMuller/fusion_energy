@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import time
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
 from sklearn.ensemble import RandomForestRegressor
@@ -65,6 +66,7 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
         return RFWrapper(rf, self.device)
     
     def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
+        start_time = time.time()
         n_int = data.X_control_int.shape[0]
         
         X_treat = torch.tensor(data.X_treat, dtype=torch.float32, device=self.device)
@@ -169,5 +171,6 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
             bias=ate - data.true_sate,
             weights_continuous=final_w[n_int:],
             weights_external=final_w[n_int:] * n_pool,
-            energy_distance=loss_cov.item()
+            energy_distance=loss_cov.item(),
+            estimation_time=time.time() - start_time
         )

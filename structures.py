@@ -26,6 +26,7 @@ class EstimationResult:
     weights_continuous: np.ndarray
     weights_external: np.ndarray
     energy_distance: float = 0.0
+    estimation_time: float = 0.0
 
     def n_external_used(self) -> int:
         return np.sum(self.weights_external > 0)

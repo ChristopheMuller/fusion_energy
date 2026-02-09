@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+import time
 
 from structures import SplitData, EstimationResult
 from metrics import optimise_soft_weights
@@ -18,6 +19,7 @@ class EnergyPooledWeightingEstimator(BaseEstimator):
             self.device = device
 
     def estimate(self, data: SplitData, **kwargs) -> EstimationResult:
+        start_time = time.time()
         n_int = data.X_control_int.shape[0]
         n_ext = data.X_external.shape[0]
         n_trt = data.X_treat.shape[0]
@@ -74,5 +76,6 @@ class EnergyPooledWeightingEstimator(BaseEstimator):
             bias=ate - data.true_sate,
             weights_continuous=w_ext,
             weights_external=w_ext/ np.sum(w_ext),
-            energy_distance=None
+            energy_distance=None,
+            estimation_time=time.time() - start_time
         )

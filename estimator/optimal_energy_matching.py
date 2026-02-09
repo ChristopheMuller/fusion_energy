@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
 from .energy_matching import EnergyMatchingEstimator
@@ -36,12 +37,15 @@ class OptimalEnergyMatchingEstimator(BaseEstimator):
         Iterates n_ext from 0 to max_external (step size) and finds the best using ternary search.
         Ignores the `n_external` argument if passed, as this estimator optimizes it.
         """
+        start_time = time.time()
         
         limit = self.max_external if self.max_external is not None else data.X_external.shape[0]
         
         # If limit is 0, we can't do much, just run with 0
         if limit == 0:
-            return self.matcher.estimate(data, n_external=0)
+            res = self.matcher.estimate(data, n_external=0)
+            res.estimation_time = time.time() - start_time
+            return res
 
         # Candidates for n_external
         # Ensure we include 0 and potentially the limit
@@ -98,4 +102,5 @@ class OptimalEnergyMatchingEstimator(BaseEstimator):
         if best_result is None:
             raise RuntimeError("Could not find any valid estimation result.")
             
+        best_result.estimation_time = time.time() - start_time
         return best_result

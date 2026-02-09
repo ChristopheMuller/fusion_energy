@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+import time
 
 from structures import SplitData, EstimationResult
 from metrics import optimise_soft_weights, compute_batch_energy
@@ -20,6 +21,7 @@ class IPWEstimator(BaseEstimator):
         self.clip_max = clip_max
 
     def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
+        start_time = time.time()
 
         x_rct = np.vstack([data.X_treat, data.X_control_int])
         x_ext = data.X_external
@@ -58,5 +60,6 @@ class IPWEstimator(BaseEstimator):
             bias = data.true_sate - ate_est,
             weights_continuous = probs_ext,
             weights_external=weights_ext,
-            energy_distance = 0
+            energy_distance = 0,
+            estimation_time=time.time() - start_time
         )

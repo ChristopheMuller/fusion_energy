@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+import time
 
 from structures import SplitData, EstimationResult
 from metrics import optimise_soft_weights, compute_batch_energy
@@ -22,6 +23,7 @@ class EnergyMatchingEstimator(BaseEstimator):
             self.device = device
 
     def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
+        start_time = time.time()
         n_int = data.X_control_int.shape[0]
         n_ext = data.X_external.shape[0]
         
@@ -71,7 +73,8 @@ class EnergyMatchingEstimator(BaseEstimator):
             bias=ate - data.true_sate,
             weights_continuous=w_int,
             weights_external=w_ext,
-            energy_distance=min_energy
+            energy_distance=min_energy,
+            estimation_time=time.time() - start_time
         )
 
     def _select_best_sample(self, X_t, X_c, X_e, probs, n_sampled):
