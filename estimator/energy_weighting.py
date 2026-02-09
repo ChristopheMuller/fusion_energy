@@ -13,7 +13,6 @@ class EnergyWeightingEstimator(BaseEstimator):
 
     def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
         n_int = data.X_control_int.shape[0]
-        n_ext = data.X_external.shape[0]
         n_t = data.X_treat.shape[0]
         
         y1_mean = np.mean(data.Y_treat)

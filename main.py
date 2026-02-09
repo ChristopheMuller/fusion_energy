@@ -4,7 +4,8 @@ from joblib import Parallel, delayed
 from structures import EstimationResult
 from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign
-from estimator import EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator, IPWEstimator, EnergyPooledWeightingEstimator
+from estimator import EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator, IPWEstimator, \
+    EnergyPooledWeightingEstimator, PrognosticEnergyWeightingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
@@ -31,7 +32,7 @@ BIAS_EXT = 0.7      # Mean shift in external data
 BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 
 N_RCT = 200
-N_EXT = 1000
+N_EXT = 500
 
 # -------------------------
 
@@ -57,31 +58,36 @@ PIPELINES = [
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=0),
             estimator=DummyMatchingEstimator()
         ),
-        MethodPipeline(
-            name="EnergyMatching_OPT_Estimator",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
-        ),
+        # MethodPipeline(
+        #     name="EnergyMatching_OPT_Estimator",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+        #     estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
+        # ),
         # MethodPipeline(
         #     name="EnergyMatching_OPT_Design_Estimator",
         #     design=EnergyOptimisedDesign(),
         #     estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
         # ),
         MethodPipeline(
-            name="IPW_weighting",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=IPWEstimator()
-        ),
-        MethodPipeline(
             name="EnergyWeighting",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
             estimator=EnergyWeightingEstimator()
         ),
         MethodPipeline(
-            name="EnergyPooledWeighting",
+            name="PrognosticEnergyWeighting_0L",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyPooledWeightingEstimator()
-        )
+            estimator=PrognosticEnergyWeightingEstimator(lamb=0)
+        ),
+        MethodPipeline(
+            name="PrognosticEnergyWeighting_01L",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=PrognosticEnergyWeightingEstimator(lamb=0.1)
+        ),
+        MethodPipeline(
+            name="PrognosticEnergyWeighting_05L",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=PrognosticEnergyWeightingEstimator(lamb=0.5)
+        ),
     ]
 # ----------------------
 
