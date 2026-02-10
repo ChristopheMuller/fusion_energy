@@ -21,7 +21,7 @@ from visualisations import (
 )
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 50
+N_SIMS = 100
 DIM = 5
 
 MEAN_RCT = np.ones(DIM)
