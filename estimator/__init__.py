@@ -17,6 +17,7 @@ from .optimal_energy_matching import OptimalEnergyMatchingEstimator
 from .ipw import IPWEstimator
 from .energy_pooled_weighting import EnergyPooledWeightingEstimator
 from .prognostic_energy_weighting import PrognosticEnergyWeightingEstimator
+from .energy_prog_matching import PrognosticEnergyMatchingEstimator
 
 __all__ = [
     "BaseEstimator",
@@ -27,4 +28,5 @@ __all__ = [
     "IPWEstimator",
     "EnergyPooledWeightingEstimator",
     "PrognosticEnergyWeightingEstimator",
+    "PrognosticEnergyMatchingEstimator",
 ]

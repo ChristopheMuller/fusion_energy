@@ -5,7 +5,7 @@ from structures import EstimationResult
 from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign
 from estimator import EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator, IPWEstimator, \
-    EnergyPooledWeightingEstimator, PrognosticEnergyWeightingEstimator
+    EnergyPooledWeightingEstimator, PrognosticEnergyWeightingEstimator, PrognosticEnergyMatchingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
