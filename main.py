@@ -5,7 +5,7 @@ from structures import EstimationResult
 from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign
 from estimator import EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator, IPWEstimator, \
-    EnergyPooledWeightingEstimator, PrognosticEnergyWeightingEstimator, PrognosticEnergyMatchingEstimator
+    EnergyPooledWeightingEstimator, PrognosticEnergyWeightingEstimator, PrognosticEnergyMatchingEstimator, REstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
@@ -21,7 +21,7 @@ from visualisations import (
 )
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 100
+N_SIMS = 30
 DIM = 5
 
 MEAN_RCT = np.ones(DIM)
@@ -69,26 +69,21 @@ PIPELINES = [
         #     design=EnergyOptimisedDesign(),
         #     estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
         # ),
+        # MethodPipeline(
+        #     name="EnergyWeighting",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+        #     estimator=EnergyWeightingEstimator(n_iter=1000)
+        # ),
+        # MethodPipeline(
+        #     name="PrognosticEnergyWeighting",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+        #     estimator=PrognosticEnergyWeightingEstimator(lamb=99, n_iter_weights=1000)
+        # )
         MethodPipeline(
-            name="EnergyWeighting",
+            name="REstimator",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyWeightingEstimator(n_iter=1000)
-        ),
-        MethodPipeline(
-            name="PrognosticEnergyWeighting_03L",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=PrognosticEnergyWeightingEstimator(lamb=0.3, n_iter_weights=1000, verbose=False)
-        ),
-        MethodPipeline(
-            name="PrognosticEnergyWeighting_05L",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=PrognosticEnergyWeightingEstimator(lamb=0.5, n_iter_weights=1000)
-        ),
-        MethodPipeline(
-            name="PrognosticEnergyWeighting_10L",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=PrognosticEnergyWeightingEstimator(lamb=10, n_iter_weights=1000)
-        ),
+            estimator=REstimator(r_script_path="R/r_dummy_no_ext.R", r_func_name="estimate_ate_r")
+        )
     ]
 # ----------------------
 

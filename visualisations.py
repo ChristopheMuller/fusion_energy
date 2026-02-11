@@ -329,8 +329,8 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
     ax2.set_ylabel('Energy Distance', color='mediumpurple')
     ax2.tick_params(axis='y', labelcolor='mediumpurple')
 
-    if df["Energy_Prognostic"].any():
-        ax2.plot(df["Avg_N_Ext"], df["Energy_Prognostic"]/10, marker='x', label='Energy Distance (Prognostic)', color='orange', linestyle='--')
+    # if df["Energy_Prognostic"].any():
+    #     ax2.plot(df["Avg_N_Ext"], df["Energy_Prognostic"]/10, marker='x', label='Energy Distance (Prognostic)', color='orange', linestyle='--')
     
     plt.title('Performance Metrics vs. External Data Sample Size')
     
