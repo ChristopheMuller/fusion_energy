@@ -20,8 +20,11 @@ from visualisations import (
     plot_estimation_time
 )
 
+import os
+os.environ["RENV_CONFIG_SANDBOX_ENABLED"] = "FALSE"
+
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 30
+N_SIMS = 50
 DIM = 5
 
 MEAN_RCT = np.ones(DIM)
@@ -69,20 +72,20 @@ PIPELINES = [
         #     design=EnergyOptimisedDesign(),
         #     estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
         # ),
-        # MethodPipeline(
-        #     name="EnergyWeighting",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-        #     estimator=EnergyWeightingEstimator(n_iter=1000)
-        # ),
+        MethodPipeline(
+            name="EnergyWeighting",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=EnergyWeightingEstimator(n_iter=1000)
+        ),
         # MethodPipeline(
         #     name="PrognosticEnergyWeighting",
         #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
         #     estimator=PrognosticEnergyWeightingEstimator(lamb=99, n_iter_weights=1000)
         # )
         MethodPipeline(
-            name="REstimator",
+            name="ebal",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=REstimator(r_script_path="R/r_dummy_no_ext.R", r_func_name="estimate_ate_r")
+            estimator=REstimator(r_script_path="R/ebal.R", r_func_name="estimate_ate_r")
         )
     ]
 # ----------------------

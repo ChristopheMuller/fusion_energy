@@ -10,3 +10,4 @@ wheels/
 .venv
 *.png
 .DS_Store
+.Rproj.user
