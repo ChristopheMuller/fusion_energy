@@ -275,6 +275,7 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
         estimates = np.array([res.ate_est for res in log.results])
         n_exts = np.array([res.sum_of_weights_external() for res in log.results])
         energies = np.array([res.energy_distance for res in log.results])
+        # energy_progs = np.array([res.energy_distance_prognostic for res in log.results if res.energy_distance_prognostic is not None])
         
         # Compute metrics
         avg_n_ext = np.mean(n_exts)
@@ -290,7 +291,8 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
             "Squared Bias": squared_bias,
             "Variance": variance,
             "MSE": mse,
-            "Energy": avg_energy
+            "Energy": avg_energy,
+            # "Energy_Prognostic": np.mean(energy_progs) if energy_progs.size > 0 else 0.0
         })
     
     df = pd.DataFrame(data).sort_values("Avg_N_Ext")
@@ -326,6 +328,9 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
 
     ax2.set_ylabel('Energy Distance', color='mediumpurple')
     ax2.tick_params(axis='y', labelcolor='mediumpurple')
+
+    if df["Energy_Prognostic"].any():
+        ax2.plot(df["Avg_N_Ext"], df["Energy_Prognostic"]/10, marker='x', label='Energy Distance (Prognostic)', color='orange', linestyle='--')
     
     plt.title('Performance Metrics vs. External Data Sample Size')
     

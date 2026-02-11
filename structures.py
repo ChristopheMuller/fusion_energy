@@ -28,6 +28,8 @@ class EstimationResult:
     energy_distance: float = 0.0
     estimation_time: float = 0.0
 
+    energy_distance_prognostic: Optional[float] = None
+
     def n_external_used(self) -> int:
         return np.sum(self.weights_external > 0)
 

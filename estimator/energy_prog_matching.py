@@ -117,7 +117,8 @@ class PrognosticEnergyMatchingEstimator(BaseEstimator):
             weights_continuous=probs,
             weights_external=final_w_ext,
             energy_distance=energy_cov,
-            estimation_time=time.time() - start_time
+            estimation_time=time.time() - start_time,
+            energy_distance_prognostic=energy_prog
         )
 
     def _optimize_mixture_weights(self, X_t, X_c, X_e, m_c, m_e, beta, n_iter):
