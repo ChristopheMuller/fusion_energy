@@ -1,5 +1,5 @@
-if (file.exists("renv/activate.R")) source("renv/activate.R")
-library(ebal)
+# if (file.exists("renv/activate.R")) source("renv/activate.R")
+suppressPackageStartupMessages(library(ebal))
 
 estimate_ate_r <- function(X_treat, Y_treat, X_control_int, Y_control_int, X_external, Y_external, true_sate, n_external) {
   
@@ -13,8 +13,9 @@ estimate_ate_r <- function(X_treat, Y_treat, X_control_int, Y_control_int, X_ext
   
   result <- tryCatch({
     X_enhanced <- ebal::matrixmaker(as.matrix(X_combined))
-    eb.out <- ebal::ebalance(Treatment = treat_vec, X = X_enhanced, print.level = 0)
-    
+    capture.output(
+      eb.out <- ebal::ebalance(Treatment = treat_vec, X = X_enhanced, print.level = 0)
+    )    
     weights_pool <- eb.out$w
     
     w_norm <- weights_pool / sum(weights_pool)

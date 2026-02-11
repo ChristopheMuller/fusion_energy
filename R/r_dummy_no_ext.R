@@ -1,4 +1,4 @@
-if (file.exists("renv/activate.R")) source("renv/activate.R")
+# if (file.exists("renv/activate.R")) source("renv/activate.R")
 
 estimate_ate_r <- function(X_treat, Y_treat, X_control_int, Y_control_int, X_external, Y_external, true_sate, n_external) {
   

@@ -1,5 +1,6 @@
-if (file.exists("renv/activate.R")) source("renv/activate.R")
-library(CBPS)
+# if (file.exists("renv/activate.R")) source("renv/activate.R")
+suppressPackageStartupMessages(library(CBPS))
+
 
 estimate_ate_cbps <- function(X_treat, Y_treat, X_control_int, Y_control_int, X_external, Y_external, true_sate, n_external) {
   
