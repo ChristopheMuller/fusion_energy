@@ -12,7 +12,6 @@ estimate_ate_r <- function(X_treat, Y_treat, X_control_int, Y_control_int, X_ext
     bias = ate_est - true_sate,
     weights_continuous = w_cont,
     weights_external = w_ext,
-    energy_distance = 0,
-    estimation_time = 0
+    energy_distance = 0
   )
 }
