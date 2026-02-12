@@ -14,9 +14,9 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
     
     Weights are optimized to minimize:
     1. Energy Distance between treatment and weighted pooled control (covariate balance)
-    2. Energy Distance between RCT control and weighted external prognostic scores (outcome regularization)
+    2. Energy Distance between treatment and weighted pooled control prognostic scores (outcome regularization)
         
-    Loss = ED_covariates(Treat, Pooled_Control^w) + lambda * ED_prognosis(RCT_Control, External^w)
+    Loss = ED_covariates(Treat, Pooled_Control^w) + lambda * ED_prognosis(Treat, Pooled_Control^w)
     """
     
     def __init__(self, lamb=0.1, lr_weights=0.01, n_iter_weights=600, 
@@ -44,7 +44,7 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
                 x_np = x.detach().cpu().numpy()
                 preds = self.model.predict(x_np)
                 return torch.tensor(preds, dtype=torch.float32, device=self.device).view(-1, 1)
-                
+        
         return RFWrapper(rf, self.device)
     
     def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
@@ -56,48 +56,40 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
         X_external = torch.tensor(data.X_external, dtype=torch.float32, device=self.device)
         Y_external = torch.tensor(data.Y_external, dtype=torch.float32, device=self.device).view(-1, 1)
         
+        n_treat = X_treat.shape[0]
         n_int = X_control_int.shape[0]
         n_ext = X_external.shape[0]
-        n_treat = X_treat.shape[0]
+        n_pool = n_int + n_ext
         
         X_pooled_control = torch.cat([X_control_int, X_external], dim=0)
         Y_pooled_control = np.concatenate([data.Y_control_int, data.Y_external], axis=0)
-        n_pool = n_int + n_ext
+
 
         # --- 2. Prognostic Model ---
         prog_model = self._train_prognostic_model(X_external, Y_external)
         with torch.no_grad():
-            m_control_int = prog_model(X_control_int) # Target for prognostic term
-            m_external = prog_model(X_external)       # Source for prognostic term
+            m_pooled = prog_model(X_pooled_control) # (n_pool, 1)
+            m_treat = prog_model(X_treat)           # (n_treat, 1) - TARGET
 
-        # --- 3. Precompute Distances & Linear Terms ---
-        
-        # A. Covariate Balance Terms (Target: Treat, Source: Pooled Control)
-        # We need d(Pooled, Treat) and d(Pooled, Pooled)
+        # --- 3. Precompute Distance Matrices ---
         with torch.no_grad():
-            d_pool_treat = torch.cdist(X_pooled_control, X_treat, p=2) # (n_pool, n_treat)
-            cov_linear_term = (2.0 / n_treat) * d_pool_treat.sum(dim=1) # (n_pool,)
+            d_XX_pool_treat = torch.cdist(X_pooled_control, X_treat, p=2) 
+            d_XX_pool_pool  = torch.cdist(X_pooled_control, X_pooled_control, p=2)
             
-            d_pool_pool = torch.cdist(X_pooled_control, X_pooled_control, p=2) # (n_pool, n_pool)
+            term1_linear_X = (2.0 / n_treat) * d_XX_pool_treat.sum(dim=1) 
+            
+            d_mm_pool_treat = torch.cdist(m_pooled, m_treat, p=2)
+            d_mm_pool_pool  = torch.cdist(m_pooled, m_pooled, p=2)
+            
+            term1_linear_m = (2.0 / n_treat) * d_mm_pool_treat.sum(dim=1)
             
             w_unif = torch.ones(n_pool, device=self.device) / n_pool
-            base_cov_loss = (torch.dot(w_unif, cov_linear_term) - torch.dot(w_unif, torch.mv(d_pool_pool, w_unif))).item()
-            s_cov = max(abs(base_cov_loss), 1e-6)
-
-        # B. Prognostic Balance Terms (Target: Control Int, Source: External)
-        # We need d(External, Control_Int) and d(External, External)
-        # Note: We only weight the 'External' part for this specific loss term
-        with torch.no_grad():
-            d_m_ext_int = torch.cdist(m_external, m_control_int, p=2) # (n_ext, n_int)
-            # Pre-average over internal control: 2 * sum(d) / n_int
-            prog_linear_term = (2.0 / n_int) * d_m_ext_int.sum(dim=1) # (n_ext,)
             
-            d_m_ext_ext = torch.cdist(m_external, m_external, p=2) # (n_ext, n_ext)
+            base_cov = (torch.dot(w_unif, term1_linear_X) - torch.dot(w_unif, torch.mv(d_XX_pool_pool, w_unif))).item()
+            base_prog = (torch.dot(w_unif, term1_linear_m) - torch.dot(w_unif, torch.mv(d_mm_pool_pool, w_unif))).item()
             
-            # Constants for scaling
-            w_ext_unif = torch.ones(n_ext, device=self.device) / n_ext
-            base_prog_loss = (torch.dot(w_ext_unif, prog_linear_term) - torch.dot(w_ext_unif, torch.mv(d_m_ext_ext, w_ext_unif))).item()
-            s_prog = max(abs(base_prog_loss), 1e-6)
+            scale_cov = max(abs(base_cov), 1e-6)
+            scale_prog = max(abs(base_prog), 1e-6)
 
         # --- 4. Optimization Loop ---
         logits = torch.zeros(n_pool, requires_grad=True, device=self.device)
@@ -114,61 +106,54 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
 
         for epoch in range(self.n_iter_weights):
             optimizer.zero_grad()
-            
-            # Softmax over ALL pooled controls
             w = F.softmax(logits, dim=0)
             
-            # 1. Covariate Loss: 2<w, d_XT> - <w, d_XX w>
-            # Uses the precomputed linear term for speed
-            loss_cov_term1 = torch.dot(w, cov_linear_term)
-            loss_cov_term2 = torch.dot(w, torch.mv(d_pool_pool, w))
-            loss_cov = loss_cov_term1 - loss_cov_term2
+            # 1. Covariate Energy Distance
+            # 2 * E[d(X_pool, X_treat)] - E[d(X_pool, X_pool)]
+            loss_cov_linear = torch.dot(w, term1_linear_X)
+            loss_cov_quadratic = torch.dot(w, torch.mv(d_XX_pool_pool, w))
+            loss_cov = loss_cov_linear - loss_cov_quadratic
+
+            # 2. Prognostic Energy Distance
+            # 2 * E[d(m_pool, m_treat)] - E[d(m_pool, m_pool)]
+            loss_prog_linear = torch.dot(w, term1_linear_m)
+            loss_prog_quadratic = torch.dot(w, torch.mv(d_mm_pool_pool, w))
+            loss_prog = loss_prog_linear - loss_prog_quadratic
             
-            # 2. Prognostic Loss: Affects only external weights part of w
-            w_ext = w[n_int:]
-            # Normalize w_ext so it sums to 1 for the prognostic comparison
-            w_ext_sum = w_ext.sum()
-            w_ext_norm = w_ext / (w_ext_sum + 1e-10)
-            
-            loss_prog_term1 = torch.dot(w_ext_norm, prog_linear_term)
-            loss_prog_term2 = torch.dot(w_ext_norm, torch.mv(d_m_ext_ext, w_ext_norm))
-            loss_prog = loss_prog_term1 - loss_prog_term2
-            
-            # Combine
-            total_loss = (loss_cov / s_cov) + self.lamb * (loss_prog / s_prog)
+            # Combined Loss
+            total_loss = (loss_cov / scale_cov) + self.lamb * (loss_prog / scale_prog)
             
             total_loss.backward()
             optimizer.step()
             scheduler.step()
 
-            current_loss = total_loss.item()
+            new_loss = total_loss.item()
+            if epoch > 10 and abs(prev_loss - new_loss) < 1e-6:
+                if self.verbose: 
+                    print(f"Converged at epoch {epoch:4d} | Total: {new_loss:.6f} | " f"Cov: {loss_cov.item():.6f} | Prog: {loss_prog.item():.6f}")
+                break
             
             if self.verbose and (epoch % 100 == 0):
-                print(f"Epoch {epoch:4d} | Total: {total_loss.item():.6f} | "
+                print(f"Epoch {epoch:4d} | Total: {new_loss:.6f} | "
                       f"Cov: {loss_cov.item():.6f} | Prog: {loss_prog.item():.6f}")
 
-            # --- EARLY STOPPING RESTORED ---
-            # We wait until at least 25% of iterations are done to avoid stopping 
-            # during the initial volatile phase of OneCycleLR warmup.
-            if abs(prev_loss - current_loss) < 1e-8 and epoch > self.n_iter_weights // 4:
-                if self.verbose:
-                    print(f"Converged at epoch {epoch} with loss {current_loss:.6f}")
-                break
-            prev_loss = current_loss
-
-        # --- 5. Result ---
+        # --- 5. Result Extraction ---
         final_w = F.softmax(logits, dim=0).detach().cpu().numpy()
         
-        # ATE Calculation
+        # ATE Calculation using weighted pooled control
         y1_mean = np.mean(data.Y_treat)
         y0_weighted_mean = np.average(Y_pooled_control, weights=final_w)
         ate = y1_mean - y0_weighted_mean
         
+        # Extract weights for external units only (for analysis/reporting)
+        # Note: final_w sums to 1 over (n_int + n_ext) units.
+        weights_external = final_w[n_int:]
+        
         return EstimationResult(
             ate_est=ate,
             bias=ate - data.true_sate,
-            weights_continuous=final_w[n_int:],
-            weights_external=final_w[n_int:] * n_pool,
+            weights_continuous=weights_external,
+            weights_external=weights_external * n_pool,
             energy_distance=loss_cov.item(),
             estimation_time=time.time() - start_time
         )
