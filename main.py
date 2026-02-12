@@ -101,6 +101,11 @@ PIPELINES = [
             name="MatchIt_Full_CBPS",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
             estimator=REstimator(r_script_path="R/MatchIt_Full_CBPS.R", r_func_name="estimate_matchit_Full_CBPS")
+        ),
+        MethodPipeline(
+            name="MatchIt_Opt_CBPS",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=REstimator(r_script_path="R/MatchIt_Opt_CBPS.R", r_func_name="estimate_matchit_Opt_CBPS")
         )
     ]
 # ----------------------
