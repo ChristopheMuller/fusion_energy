@@ -24,10 +24,13 @@ estimate_cbps <- function(X_treat, Y_treat, X_control_int, Y_control_int, X_exte
   start_time <- Sys.time()
   
   result <- tryCatch({
-    cbps_fit <- CBPS(as.formula(formula_str), 
-                     data = df_combined, 
-                     ATT = 1,
-                     standardize = TRUE)
+
+    capture.output(
+      cbps_fit <- CBPS(as.formula(formula_str), 
+                      data = df_combined, 
+                      ATT = 1,
+                      standardize = TRUE)
+    )
     
     all_weights <- cbps_fit$weights
     

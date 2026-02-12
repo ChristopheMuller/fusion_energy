@@ -93,11 +93,15 @@ PIPELINES = [
             estimator=REstimator(r_script_path="R/CBPS.R", r_func_name="estimate_cbps")
         ),
         MethodPipeline(
-            name="MatchIt_CBPS",
+            name="MatchIt_NN_CBPS",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=REstimator(r_script_path="R/MatchIt_CBPS.R", r_func_name="estimate_matchit_CBPS")
+            estimator=REstimator(r_script_path="R/MatchIt_NN_CBPS.R", r_func_name="estimate_matchit_NN_CBPS")
+        ),
+        MethodPipeline(
+            name="MatchIt_Full_CBPS",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=REstimator(r_script_path="R/MatchIt_Full_CBPS.R", r_func_name="estimate_matchit_Full_CBPS")
         )
-
     ]
 # ----------------------
 

@@ -2,7 +2,7 @@
 suppressPackageStartupMessages(library(MatchIt))
 suppressPackageStartupMessages(library(CBPS))
 
-estimate_matchit_CBPS <- function(X_treat, Y_treat, X_control_int, Y_control_int, X_external, Y_external, true_sate, n_external) {
+estimate_matchit_NN_CBPS <- function(X_treat, Y_treat, X_control_int, Y_control_int, X_external, Y_external, true_sate, n_external) {
   
   # 1. Pool all controls (Internal + External)
   X_pool <- rbind(X_control_int, X_external)
