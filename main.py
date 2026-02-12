@@ -85,13 +85,19 @@ PIPELINES = [
         MethodPipeline(
             name="ebal",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=REstimator(r_script_path="R/ebal.R", r_func_name="estimate_ate_r")
+            estimator=REstimator(r_script_path="R/ebal.R", r_func_name="estimate_ebal")
         ),
         MethodPipeline(
             name="CBPS",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=REstimator(r_script_path="R/CBPS.R", r_func_name="estimate_ate_r")
+            estimator=REstimator(r_script_path="R/CBPS.R", r_func_name="estimate_cbps")
+        ),
+        MethodPipeline(
+            name="MatchIt_CBPS",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=REstimator(r_script_path="R/MatchIt_CBPS.R", r_func_name="estimate_matchit_CBPS")
         )
+
     ]
 # ----------------------
 
