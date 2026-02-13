@@ -5,7 +5,7 @@ from structures import EstimationResult
 from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign
 from estimator import EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator, IPWEstimator, \
-    EnergyPooledWeightingEstimator, PrognosticEnergyWeightingEstimator, PrognosticEnergyMatchingEstimator, REstimator
+    EnergyPooledWeightingEstimator, PrognosticEnergyWeightingEstimator, PrognosticEnergyMatchingEstimator, REstimator, OptimalEnergyMatchingProgEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
@@ -24,7 +24,7 @@ import os
 os.environ["RENV_CONFIG_SANDBOX_ENABLED"] = "FALSE"
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 50
+N_SIMS = 100
 DIM = 5
 
 MEAN_RCT = np.ones(DIM)
@@ -62,11 +62,11 @@ PIPELINES = [
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=0),
             estimator=DummyMatchingEstimator()
         ),
-        # MethodPipeline(
-        #     name="EnergyMatching_OPT_Estimator",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-        #     estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
-        # ),
+        MethodPipeline(
+            name="EnergyMatching_OPT_Estimator",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+            estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
+        ),
         # MethodPipeline(
         #     name="EnergyMatching_OPT_Design_Estimator",
         #     design=EnergyOptimisedDesign(),
@@ -80,8 +80,8 @@ PIPELINES = [
         # MethodPipeline(
         #     name="PrognosticEnergyWeighting",
         #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-        #     estimator=PrognosticEnergyWeightingEstimator(lamb=99, n_iter_weights=1000)
-        # )
+        #     estimator=PrognosticEnergyWeightingEstimator(lamb=0.005, n_iter_weights=1000)
+        # ),
         MethodPipeline(
             name="ebal",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
@@ -92,21 +92,26 @@ PIPELINES = [
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
             estimator=REstimator(r_script_path="R/CBPS.R", r_func_name="estimate_cbps")
         ),
+        # MethodPipeline(
+        #     name="MatchIt_NN_CBPS",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+        #     estimator=REstimator(r_script_path="R/MatchIt_NN_CBPS.R", r_func_name="estimate_matchit_NN_CBPS")
+        # ),
+        # MethodPipeline(
+        #     name="MatchIt_Full_CBPS",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+        #     estimator=REstimator(r_script_path="R/MatchIt_Full_CBPS.R", r_func_name="estimate_matchit_Full_CBPS")
+        # ),
+        # MethodPipeline(
+        #     name="MatchIt_Opt_CBPS",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
+        #     estimator=REstimator(r_script_path="R/MatchIt_Opt_CBPS.R", r_func_name="estimate_matchit_Opt_CBPS")
+        # ),
         MethodPipeline(
-            name="MatchIt_NN_CBPS",
+            name="EnergyMatching_OptProg",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=REstimator(r_script_path="R/MatchIt_NN_CBPS.R", r_func_name="estimate_matchit_NN_CBPS")
+            estimator=OptimalEnergyMatchingProgEstimator(step=3, k_best=50, max_external=150)
         ),
-        MethodPipeline(
-            name="MatchIt_Full_CBPS",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=REstimator(r_script_path="R/MatchIt_Full_CBPS.R", r_func_name="estimate_matchit_Full_CBPS")
-        ),
-        MethodPipeline(
-            name="MatchIt_Opt_CBPS",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=REstimator(r_script_path="R/MatchIt_Opt_CBPS.R", r_func_name="estimate_matchit_Opt_CBPS")
-        )
     ]
 # ----------------------
 

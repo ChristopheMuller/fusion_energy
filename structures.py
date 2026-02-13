@@ -25,8 +25,8 @@ class EstimationResult:
     bias: float
     weights_continuous: np.ndarray
     weights_external: np.ndarray
-    energy_distance: float = 0.0
-    estimation_time: float = 0.0
+    energy_distance: float = None
+    estimation_time: float = None
 
     energy_distance_prognostic: Optional[float] = None
 
