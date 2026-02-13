@@ -20,6 +20,7 @@ from .prognostic_energy_weighting import PrognosticEnergyWeightingEstimator
 from .energy_prog_matching import PrognosticEnergyMatchingEstimator
 from .r_bridge import REstimator
 from .optimal_energy_matching_prog import OptimalEnergyMatchingProgEstimator
+from .energy_matching_prog import EnergyMatchingProgEstimator
 
 __all__ = [
     "BaseEstimator",
@@ -32,5 +33,6 @@ __all__ = [
     "PrognosticEnergyWeightingEstimator",
     "PrognosticEnergyMatchingEstimator",
     "REstimator",
-    "OptimalEnergyMatchingProgEstimator"
+    "OptimalEnergyMatchingProgEstimator",
+    "EnergyMatchingProgEstimator",
 ]
