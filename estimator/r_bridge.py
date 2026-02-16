@@ -1,21 +1,13 @@
 import numpy as np
+import rpy2.robjects as robjects
 import time
-try:
-    import rpy2.robjects as robjects
-    from rpy2.robjects import numpy2ri
-    from rpy2.robjects.conversion import localconverter
-    RPY2_AVAILABLE = True
-except (ImportError, ValueError):
-    RPY2_AVAILABLE = False
-
+from rpy2.robjects import numpy2ri
+from rpy2.robjects.conversion import localconverter
 from estimator.base import BaseEstimator
 from structures import SplitData, EstimationResult
 
 _SOURCED_R_FILES = set()
-if RPY2_AVAILABLE:
-    NP_CONVERTER = robjects.default_converter + numpy2ri.converter
-else:
-    NP_CONVERTER = None
+NP_CONVERTER = robjects.default_converter + numpy2ri.converter
 
 class REstimator(BaseEstimator):
     def __init__(self, r_script_path: str, r_func_name: str, n_external: int = None):
@@ -26,8 +18,6 @@ class REstimator(BaseEstimator):
 
     @property
     def r_func(self):
-        if not RPY2_AVAILABLE:
-            raise ImportError("rpy2 or R is not available.")
 
         if self.r_script_path not in _SOURCED_R_FILES:
             robjects.r.source(self.r_script_path)
@@ -38,8 +28,6 @@ class REstimator(BaseEstimator):
         return self._r_func
 
     def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
-        if not RPY2_AVAILABLE:
-            raise ImportError("rpy2 or R is not available.")
 
         start_time = time.time()
 
