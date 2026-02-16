@@ -52,8 +52,7 @@ class EnergyMatchingEstimator(BaseEstimator):
             lr=self.lr,
             n_iter=self.n_iter
         )
-        probs = F.softmax(logits, dim=0).cpu().numpy()
-        probs /= probs.sum()
+        probs = F.softmax(logits, dim=0)
         
         # 3. Select Best Sample (Stochastic Selection)
         # We pick the specific binary subset that minimizes energy
@@ -62,7 +61,7 @@ class EnergyMatchingEstimator(BaseEstimator):
         # 4. Construct Estimation Result
         w_ext = np.zeros(n_ext)
         w_ext[best_indices] = 1.0
-        w_int = probs
+        w_int = probs.cpu().numpy()
         
         # ATT Estimate
         y0_weighted = (np.sum(data.Y_control_int) + np.sum(data.Y_external[best_indices])) / (n_int + target_n)
@@ -80,13 +79,11 @@ class EnergyMatchingEstimator(BaseEstimator):
     def _select_best_sample(self, X_t, X_c, X_e, probs, n_sampled):
         """Samples k_best subsets and picks the one minimizing Pooled Energy."""
         # A. Sample
-        pool_idx = np.arange(len(probs))
-        
-        batch_indices = [
-            np.random.choice(pool_idx, size=n_sampled, replace=False, p=probs)
-            for _ in range(self.k_best)
-        ]
-        batch_idx_tensor = torch.tensor(np.array(batch_indices), device=self.device, dtype=torch.long)
+        batch_idx_tensor = torch.multinomial(
+            probs.expand(self.k_best, -1),
+            num_samples=n_sampled,
+            replacement=False
+        )
         
         # B. Prepare Batches
         X_source_batch = X_e[batch_idx_tensor] # (k, n, dim)
@@ -101,4 +98,4 @@ class EnergyMatchingEstimator(BaseEstimator):
         # D. Pick Best
         best_k_idx = torch.argmin(energies).item()
         min_energy = energies[best_k_idx].item()
-        return batch_indices[best_k_idx], min_energy
+        return batch_idx_tensor[best_k_idx].cpu().numpy(), min_energy
