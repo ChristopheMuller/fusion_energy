@@ -69,7 +69,7 @@ weights = estimation_result.weights_continuous / np.sum(estimation_result.weight
 
 # build prognostic model on external data
 from sklearn.ensemble import RandomForestRegressor
-prognostic_model = RandomForestRegressor()
+prognostic_model = RandomForestRegressor(n_jobs=1)
 prognostic_model.fit(X_external, Y_external)
 
 # plot the predicted values of the prognostic model on the RCT data
