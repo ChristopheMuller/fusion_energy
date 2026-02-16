@@ -14,7 +14,7 @@ def verify_split_data(split_data: SplitData, n_rct: int, n_ext: int):
     assert hasattr(split_data, 'target_n_aug')
 
 def test_fixed_ratio_design(rct_pool, ext_pool):
-    design = FixedRatioDesign(treat_ratio=0.5, target_n_aug=5)
+    design = FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=5)
     split_data = design.split(rct_pool, ext_pool)
     n_rct = rct_pool.X.shape[0]
     n_ext = ext_pool.X.shape[0]
