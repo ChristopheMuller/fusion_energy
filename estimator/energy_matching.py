@@ -38,9 +38,9 @@ class EnergyMatchingEstimator(BaseEstimator):
         y1_mean = np.mean(data.Y_treat)
         
         # 1. Tensor Setup
-        X_t = torch.tensor(data.X_treat, dtype=torch.float32, device=self.device)
-        X_c = torch.tensor(data.X_control_int, dtype=torch.float32, device=self.device)
-        X_e = torch.tensor(data.X_external, dtype=torch.float32, device=self.device)
+        X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
+        X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
+        X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
 
         # 2. Optimise Soft Weights (Metrics API)
         # Learn soft weights such that X_c + (X_e weighted) approx X_t

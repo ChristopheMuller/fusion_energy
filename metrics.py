@@ -206,10 +206,10 @@ def compute_weighted_energy(
         device = torch.device("cpu") # Default to CPU for evaluation to save GPU memory/transfer overhead if not needed
 
     # Convert to Tensor
-    Xt = torch.tensor(X_target, dtype=torch.float32, device=device)
-    Xi = torch.tensor(X_internal, dtype=torch.float32, device=device)
-    Xe = torch.tensor(X_external, dtype=torch.float32, device=device)
-    w_ext = torch.tensor(weights_external, dtype=torch.float32, device=device)
+    Xt = torch.as_tensor(X_target, dtype=torch.float32, device=device)
+    Xi = torch.as_tensor(X_internal, dtype=torch.float32, device=device)
+    Xe = torch.as_tensor(X_external, dtype=torch.float32, device=device)
+    w_ext = torch.as_tensor(weights_external, dtype=torch.float32, device=device)
     
     n_t = Xt.shape[0]
     n_i = Xi.shape[0]

@@ -19,8 +19,8 @@ class EnergyWeightingEstimator(BaseEstimator):
         
         y1_mean = np.mean(data.Y_treat)
         
-        X_t = torch.tensor(data.X_treat, dtype=torch.float32, device=self.device)
-        X_pool = torch.tensor(np.concatenate([data.X_control_int, data.X_external], axis=0), 
+        X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
+        X_pool = torch.as_tensor(np.concatenate([data.X_control_int, data.X_external], axis=0),
                               dtype=torch.float32, device=self.device)
         Y_pool = np.concatenate([data.Y_control_int, data.Y_external], axis=0)
 

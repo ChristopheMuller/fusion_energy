@@ -48,14 +48,14 @@ class EnergyMatchingProgEstimator(BaseEstimator):
         rf.fit(data.X_external, data.Y_external)
         
         # Convert m(X) to tensors for fast batched computation later
-        m_c = torch.tensor(rf.predict(data.X_control_int), dtype=torch.float32, device=self.device)
-        m_e = torch.tensor(rf.oob_prediction_, dtype=torch.float32, device=self.device)
-        m_t = torch.tensor(rf.predict(data.X_treat), dtype=torch.float32, device=self.device)
+        m_c = torch.as_tensor(rf.predict(data.X_control_int), dtype=torch.float32, device=self.device)
+        m_e = torch.as_tensor(rf.oob_prediction_, dtype=torch.float32, device=self.device)
+        m_t = torch.as_tensor(rf.predict(data.X_treat), dtype=torch.float32, device=self.device)
         
         # 1. Tensor Setup for Covariates
-        X_t = torch.tensor(data.X_treat, dtype=torch.float32, device=self.device)
-        X_c = torch.tensor(data.X_control_int, dtype=torch.float32, device=self.device)
-        X_e = torch.tensor(data.X_external, dtype=torch.float32, device=self.device)
+        X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
+        X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
+        X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
 
         logits = self._optimise_soft_weights(
             X_source=X_e,
@@ -185,7 +185,7 @@ class EnergyMatchingProgEstimator(BaseEstimator):
             np.random.choice(pool_idx, size=n_sampled, replace=False, p=probs)
             for _ in range(self.k_best)
         ]
-        batch_idx_tensor = torch.tensor(np.array(batch_indices), device=self.device, dtype=torch.long)
+        batch_idx_tensor = torch.as_tensor(np.array(batch_indices), device=self.device, dtype=torch.long)
         
         # B. Prepare Batches
         X_source_batch = X_e[batch_idx_tensor] # (k, n, dim)
