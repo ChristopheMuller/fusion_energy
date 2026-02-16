@@ -46,7 +46,7 @@ class PrognosticEnergyMatchingEstimator(BaseEstimator):
             def __call__(self, x):
                 x_np = x.detach().cpu().numpy()
                 preds = self.model.predict(x_np)
-                return torch.tensor(preds, dtype=torch.float32, device=self.device).view(-1, 1)
+                return torch.as_tensor(preds, dtype=torch.float32, device=self.device).view(-1, 1)
                 
         return RFWrapper(rf, self.device)
 
@@ -69,10 +69,10 @@ class PrognosticEnergyMatchingEstimator(BaseEstimator):
         beta = target_n / (target_n + n_int)
 
         # 2. Data to Tensor
-        X_t = torch.tensor(data.X_treat, dtype=torch.float32, device=self.device)
-        X_c = torch.tensor(data.X_control_int, dtype=torch.float32, device=self.device)
-        X_e = torch.tensor(data.X_external, dtype=torch.float32, device=self.device)
-        Y_e = torch.tensor(data.Y_external, dtype=torch.float32, device=self.device).view(-1, 1)
+        X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
+        X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
+        X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
+        Y_e = torch.as_tensor(data.Y_external, dtype=torch.float32, device=self.device).view(-1, 1)
 
         # 3. Prognostic Model
         # Train and store
@@ -221,19 +221,13 @@ class PrognosticEnergyMatchingEstimator(BaseEstimator):
         """
         Samples k_best subsets and minimizes discrete Dual Loss.
         """
-        n_ext = len(probs)
-        pool_idx = np.arange(n_ext)
-        
-        # 1. Sample Indices
-        batch_indices_list = []
-        for _ in range(self.k_best):
-            try:
-                idx = np.random.choice(pool_idx, size=n_sampled, replace=False, p=probs)
-            except ValueError:
-                idx = np.random.choice(pool_idx, size=n_sampled, replace=False)
-            batch_indices_list.append(idx)
-        
-        batch_idx_tensor = torch.tensor(np.array(batch_indices_list), device=self.device, dtype=torch.long)
+        # 1. Sample Indices (Vectorized)
+        probs_tensor = torch.tensor(probs, device=self.device, dtype=torch.float32)
+        batch_idx_tensor = torch.multinomial(
+            probs_tensor.expand(self.k_best, -1),
+            num_samples=n_sampled,
+            replacement=False
+        )
         
         # 2. Prepare Batches
         X_e_batch = X_e[batch_idx_tensor] # (k, n, dim)
@@ -266,7 +260,7 @@ class PrognosticEnergyMatchingEstimator(BaseEstimator):
         best_k = torch.argmin(total_loss).item()
         
         return (
-            batch_indices_list[best_k], 
+            batch_idx_tensor[best_k].cpu().numpy(),
             total_loss[best_k].item(),
             energy_cov[best_k].item(),
             energy_prog[best_k].item()

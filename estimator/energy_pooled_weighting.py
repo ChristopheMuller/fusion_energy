@@ -28,9 +28,9 @@ class EnergyPooledWeightingEstimator(BaseEstimator):
         y1_mean = np.mean(data.Y_treat)
         
         # 1. Tensor Setup
-        X_t_t = torch.tensor(data.X_treat, dtype=torch.float32, device=self.device)
-        X_c_t = torch.tensor(data.X_control_int, dtype=torch.float32, device=self.device)
-        X_e_t = torch.tensor(data.X_external, dtype=torch.float32, device=self.device)
+        X_t_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
+        X_c_t = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
+        X_e_t = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
 
         X_rct_t = torch.cat([X_t_t, X_c_t], dim=0)
 
