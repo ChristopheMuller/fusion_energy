@@ -43,7 +43,7 @@ class EnergyMatchingProgEstimator(BaseEstimator):
             n_estimators=100, 
             max_depth=5,
             oob_score=True,
-            n_jobs=-1
+            n_jobs=1
         )
         rf.fit(data.X_external, data.Y_external)
         

@@ -32,7 +32,7 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
         X_np = X_ext.detach().cpu().numpy()
         Y_np = Y_ext.detach().cpu().numpy().ravel()
         
-        rf = RandomForestRegressor(n_estimators=200, max_depth=5, n_jobs=-1)
+        rf = RandomForestRegressor(n_estimators=200, max_depth=5, n_jobs=1)
         rf.fit(X_np, Y_np)
         
         class RFWrapper:
