@@ -221,19 +221,13 @@ class PrognosticEnergyMatchingEstimator(BaseEstimator):
         """
         Samples k_best subsets and minimizes discrete Dual Loss.
         """
-        n_ext = len(probs)
-        pool_idx = np.arange(n_ext)
-        
-        # 1. Sample Indices
-        batch_indices_list = []
-        for _ in range(self.k_best):
-            try:
-                idx = np.random.choice(pool_idx, size=n_sampled, replace=False, p=probs)
-            except ValueError:
-                idx = np.random.choice(pool_idx, size=n_sampled, replace=False)
-            batch_indices_list.append(idx)
-        
-        batch_idx_tensor = torch.tensor(np.array(batch_indices_list), device=self.device, dtype=torch.long)
+        # 1. Sample Indices (Vectorized)
+        probs_tensor = torch.tensor(probs, device=self.device, dtype=torch.float32)
+        batch_idx_tensor = torch.multinomial(
+            probs_tensor.expand(self.k_best, -1),
+            num_samples=n_sampled,
+            replacement=False
+        )
         
         # 2. Prepare Batches
         X_e_batch = X_e[batch_idx_tensor] # (k, n, dim)
@@ -266,7 +260,7 @@ class PrognosticEnergyMatchingEstimator(BaseEstimator):
         best_k = torch.argmin(total_loss).item()
         
         return (
-            batch_indices_list[best_k], 
+            batch_idx_tensor[best_k].cpu().numpy(),
             total_loss[best_k].item(),
             energy_cov[best_k].item(),
             energy_prog[best_k].item()
