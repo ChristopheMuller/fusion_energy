@@ -43,7 +43,7 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
             def __call__(self, x):
                 x_np = x.detach().cpu().numpy()
                 preds = self.model.predict(x_np)
-                return torch.tensor(preds, dtype=torch.float32, device=self.device).view(-1, 1)
+                return torch.as_tensor(preds, dtype=torch.float32, device=self.device).view(-1, 1)
         
         return RFWrapper(rf, self.device)
     
@@ -51,10 +51,10 @@ class PrognosticEnergyWeightingEstimator(BaseEstimator):
         start_time = time.time()
         
         # --- 1. Data Prep ---
-        X_treat = torch.tensor(data.X_treat, dtype=torch.float32, device=self.device)
-        X_control_int = torch.tensor(data.X_control_int, dtype=torch.float32, device=self.device)
-        X_external = torch.tensor(data.X_external, dtype=torch.float32, device=self.device)
-        Y_external = torch.tensor(data.Y_external, dtype=torch.float32, device=self.device).view(-1, 1)
+        X_treat = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
+        X_control_int = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
+        X_external = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
+        Y_external = torch.as_tensor(data.Y_external, dtype=torch.float32, device=self.device).view(-1, 1)
         
         n_treat = X_treat.shape[0]
         n_int = X_control_int.shape[0]

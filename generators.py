@@ -12,7 +12,7 @@ class DataGenerator:
         # Toeplitz structure
         idx = np.arange(self.dim)
         cov = var * (corr ** np.abs(idx[:, None] - idx[None, :]))
-        return np.random.multivariate_normal(mean, cov, n)
+        return np.random.multivariate_normal(mean, cov, n).astype(np.float32)
 
     def _generate_outcomes(self, X, treatment_effect, beta_bias=None):
         """
@@ -29,7 +29,7 @@ class DataGenerator:
             raise ValueError("treatment_effect must be a scalar or a callable function.")
 
         current_beta = self.beta if beta_bias is None else self.beta + beta_bias
-        y0 = X @ current_beta + np.random.normal(0, 0.5, n)
+        y0 = (X @ current_beta + np.random.normal(0, 0.5, n)).astype(np.float32)
 
         # # make a very non-linear outcome (assume big dimension):
         # y0 = np.zeros(n)
@@ -44,7 +44,7 @@ class DataGenerator:
         #         y0 += 1.5 * X[:, d]
         # y0 += np.random.normal(0, 0.5, n)
 
-        y1 = y0 + treatment_effect
+        y1 = (y0 + treatment_effect).astype(np.float32)
         return y0, y1
 
     def generate_rct_pool(self, n, mean, var, corr=0.0, treatment_effect=None):

@@ -49,4 +49,4 @@ def test_data_generator_callable_treatment_effect():
 
     expected_diff = rct_data.X[:, 0] * 2.0
     actual_diff = rct_data.Y1 - rct_data.Y0
-    np.testing.assert_allclose(actual_diff, expected_diff)
+    np.testing.assert_allclose(actual_diff, expected_diff, rtol=1e-5, atol=1e-5)

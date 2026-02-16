@@ -46,7 +46,7 @@ class PrognosticEnergyMatchingEstimator(BaseEstimator):
             def __call__(self, x):
                 x_np = x.detach().cpu().numpy()
                 preds = self.model.predict(x_np)
-                return torch.tensor(preds, dtype=torch.float32, device=self.device).view(-1, 1)
+                return torch.as_tensor(preds, dtype=torch.float32, device=self.device).view(-1, 1)
                 
         return RFWrapper(rf, self.device)
 
@@ -69,10 +69,10 @@ class PrognosticEnergyMatchingEstimator(BaseEstimator):
         beta = target_n / (target_n + n_int)
 
         # 2. Data to Tensor
-        X_t = torch.tensor(data.X_treat, dtype=torch.float32, device=self.device)
-        X_c = torch.tensor(data.X_control_int, dtype=torch.float32, device=self.device)
-        X_e = torch.tensor(data.X_external, dtype=torch.float32, device=self.device)
-        Y_e = torch.tensor(data.Y_external, dtype=torch.float32, device=self.device).view(-1, 1)
+        X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
+        X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
+        X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
+        Y_e = torch.as_tensor(data.Y_external, dtype=torch.float32, device=self.device).view(-1, 1)
 
         # 3. Prognostic Model
         # Train and store

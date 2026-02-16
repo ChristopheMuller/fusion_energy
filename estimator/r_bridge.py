@@ -1,16 +1,23 @@
 import numpy as np
-import rpy2.robjects as robjects
 import time
-from rpy2.robjects import numpy2ri
-from rpy2.robjects.conversion import localconverter
+try:
+    import rpy2.robjects as robjects
+    from rpy2.robjects import numpy2ri
+    from rpy2.robjects.conversion import localconverter
+    RPY2_AVAILABLE = True
+except (ImportError, ValueError):
+    RPY2_AVAILABLE = False
 from estimator.base import BaseEstimator
 from structures import SplitData, EstimationResult
 
 _SOURCED_R_FILES = set()
-NP_CONVERTER = robjects.default_converter + numpy2ri.converter
+if RPY2_AVAILABLE:
+    NP_CONVERTER = robjects.default_converter + numpy2ri.converter
 
 class REstimator(BaseEstimator):
     def __init__(self, r_script_path: str, r_func_name: str, n_external: int = None):
+        if not RPY2_AVAILABLE:
+            raise ImportError("rpy2 is not available or R is not installed correctly.")
         super().__init__(n_external=n_external)
         self.r_script_path = r_script_path
         self.r_func_name = r_func_name
