@@ -3,9 +3,9 @@ import time
 from sklearn.ensemble import RandomForestRegressor
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
-from .energy_matching import EnergyMatchingEstimator
+from .energy_matching import Energy_MatchingEstimator
 
-class OptimalEnergyMatchingProgEstimator(BaseEstimator):
+class OptimalProg_Energy_MatchingEstimator(BaseEstimator):
     def __init__(self, 
                  max_external: int = None, 
                  step: int = 1, 
@@ -22,7 +22,7 @@ class OptimalEnergyMatchingProgEstimator(BaseEstimator):
         self.device = device
         
         # We reuse the matching estimator
-        self.matcher = EnergyMatchingEstimator(
+        self.matcher = Energy_MatchingEstimator(
             k_best=k_best, 
             lr=lr, 
             n_iter=n_iter, 
@@ -64,7 +64,7 @@ class OptimalEnergyMatchingProgEstimator(BaseEstimator):
             
         memo = {}
 
-        def get_energy(idx):
+        def get_score(idx):
             n = candidates[idx]
             if n in memo:
                 return memo[n][0]
@@ -87,26 +87,26 @@ class OptimalEnergyMatchingProgEstimator(BaseEstimator):
         while right - left > 2:
             m1 = left + (right - left) // 3
             m2 = right - (right - left) // 3
-            e1 = get_energy(m1)
-            e2 = get_energy(m2)
-            
+            e1 = get_score(m1)
+            e2 = get_score(m2)
+
             if e1 < e2:
                 right = m2
             else:
                 left = m1
                 
         best_result = None
-        min_energy = float('inf')
+        min_score = float('inf')
         
         for i in range(left, right + 1):
             n = candidates[i]
             if n not in memo:
-                get_energy(i)
+                get_score(i)
                 
             if n in memo:
                 energy, res = memo[n]
-                if energy < min_energy:
-                    min_energy = energy
+                if energy < min_score:
+                    min_score = energy
                     best_result = res
             
         if best_result is None:

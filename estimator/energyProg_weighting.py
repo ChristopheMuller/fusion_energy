@@ -8,7 +8,7 @@ from .base import BaseEstimator
 from sklearn.ensemble import RandomForestRegressor
 
 
-class PrognosticEnergyWeightingEstimator(BaseEstimator):
+class EnergyProg_WeightingEstimator(BaseEstimator):
     """
     Estimates ATE by weighting the pooled control arm (internal + external).
     

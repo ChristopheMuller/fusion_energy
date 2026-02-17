@@ -11,13 +11,13 @@ from .dummy import Dummy_MatchingEstimator
 from .energy_weighting import Energy_WeightingEstimator
 from .energy_matching import Energy_MatchingEstimator
 from .optimal_energy_matching import Optimal_Energy_MatchingEstimator
+from .optimal_energy_matching_prog import OptimalProg_Energy_MatchingEstimator
 
-# from .energyProg_weighting import EnergyProg_WeightingEstimator
-# from .energyProg_matching import EnergyProg_MatchingEstimator
+from .energyProg_weighting import EnergyProg_WeightingEstimator
+from .energyProg_matching import EnergyProg_MatchingEstimator
 
-# from .optimal_energy_matching_prog import Optimal_EnergyMatchingProgEstimator
-# from .energy_matching_prog import EnergyProg_MatchingEstimator
-# from .optimal_energyProg_matching import Optimal_Energy_MatchingEstimator
+from .MSEProg_matching import MSEProg_MatchingEstimator
+from .optimal_MSEProg_matching import Optimal_MSEProg_MatchingEstimator
 
 from .r_bridge import REstimator
 
@@ -28,13 +28,13 @@ __all__ = [
     "Energy_WeightingEstimator",
     "Energy_MatchingEstimator",
     "Optimal_Energy_MatchingEstimator",
+    "OptimalProg_Energy_MatchingEstimator",
 
-    # "EnergyProg_WeightingEstimator",
-    # "EnergyProg_MatchingEstimator",
+    "EnergyProg_WeightingEstimator",
+    "EnergyProg_MatchingEstimator",
 
-    # "Optimal_EnergyMatchingProgEstimator",
-    # "EnergyProg_MatchingEstimator",
-    # "Optimal_EnergyMatchingEstimator",
+    "MSEProg_MatchingEstimator",
+    "Optimal_MSEProg_MatchingEstimator",
 
     "REstimator",
 ]

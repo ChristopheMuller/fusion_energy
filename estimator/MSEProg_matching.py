@@ -8,7 +8,7 @@ from structures import SplitData, EstimationResult
 from metrics import compute_batch_energy
 from .base import BaseEstimator
 
-class EnergyMatchingProgEstimator(BaseEstimator):
+class MSEProg_MatchingEstimator(BaseEstimator):
     """
     Selects a subset of external controls that minimizes a combination of the Energy Distance 
     and a Prognostic Regularizer between the pooled control arm and the Treatment arm.

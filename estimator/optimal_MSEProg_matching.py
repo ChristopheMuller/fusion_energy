@@ -2,9 +2,9 @@ import numpy as np
 import time
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
-from .energy_matching_prog import EnergyMatchingProgEstimator
+from .MSEProg_matching import MSEProg_MatchingEstimator
 
-class OptimalEnergyMatchingEstimator(BaseEstimator):
+class Optimal_MSEProg_MatchingEstimator(BaseEstimator):
     """
     Finds the optimal number of external controls to add by minimizing Energy Distance.
     It iterates over a range of n_external values and selects the one that yields the lowest Energy Distance.
@@ -27,7 +27,7 @@ class OptimalEnergyMatchingEstimator(BaseEstimator):
         self.lamb = lamb
         
         # We reuse the matching estimator
-        self.matcher = EnergyMatchingProgEstimator(
+        self.matcher = MSEProg_MatchingEstimator(
             k_best=k_best, 
             lr=lr, 
             n_iter=n_iter, 

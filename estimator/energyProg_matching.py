@@ -8,7 +8,7 @@ from structures import SplitData, EstimationResult
 from .base import BaseEstimator
 from metrics import compute_batch_energy
 
-class PrognosticEnergyMatchingEstimator(BaseEstimator):
+class EnergyProg_MatchingEstimator(BaseEstimator):
     """
     Selects a subset of external controls to minimize a dual objective for the POOLED control arm.
     

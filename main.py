@@ -5,7 +5,7 @@ from structures import EstimationResult
 from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign
 from estimator import Dummy_MatchingEstimator, Energy_WeightingEstimator, Energy_MatchingEstimator, Optimal_Energy_MatchingEstimator, \
-    REstimator
+    REstimator, EnergyProg_WeightingEstimator, EnergyProg_MatchingEstimator, OptimalProg_Energy_MatchingEstimator
 
 from dataclasses import dataclass, field
 from typing import List, Any
@@ -36,8 +36,8 @@ VAR_EXT = 1.5
 BIAS_EXT = 0.7      # Mean shift in external data
 BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 
-NON_LINEAR_COVARIATES = False
-NON_LINEAR_OUTCOME = False
+NON_LINEAR_COVARIATES = True
+NON_LINEAR_OUTCOME = True
 
 N_RCT = 200
 N_EXT = 1000
@@ -72,61 +72,6 @@ PIPELINES = [
             estimator=Energy_WeightingEstimator()
         ),
         MethodPipeline(
-            name="Energy_Matching_K10",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=10),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_K20",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=20),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_K30",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=30),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_K40",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=40),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_K50",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=50),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_K60",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=60),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_K70",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=70),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_K80",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=80),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_K90",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=90),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_K100",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=100),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="Energy_Matching_K110",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=110),
-            estimator=Energy_MatchingEstimator()
-        ),
-        MethodPipeline(
             name="Optimal_Energy_Matching",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
             estimator=Optimal_Energy_MatchingEstimator(max_external=150, step=3)
@@ -140,7 +85,22 @@ PIPELINES = [
             name="R_cbps",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
             estimator=REstimator(r_script_path="R/CBPS.R", r_func_name="estimate_cbps")
-        )
+        ),
+        MethodPipeline(
+            name="EnergyProg_Weighting",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
+            estimator=EnergyProg_WeightingEstimator()
+        ),
+        MethodPipeline(
+            name="EnergyProg_Matching",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=30),
+            estimator=EnergyProg_MatchingEstimator()
+        ),
+        MethodPipeline(
+            name="OptimalProg_Energy_Matching",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
+            estimator=OptimalProg_Energy_MatchingEstimator(max_external=150, step=3)
+        ),
 ]
 # ----------------------
 
