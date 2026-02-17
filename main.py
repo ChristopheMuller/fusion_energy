@@ -6,7 +6,7 @@ from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign
 from estimator import EnergyMatchingEstimator, DummyMatchingEstimator, EnergyWeightingEstimator, OptimalEnergyMatchingEstimator, IPWEstimator, \
     EnergyPooledWeightingEstimator, PrognosticEnergyWeightingEstimator, PrognosticEnergyMatchingEstimator, REstimator, OptimalEnergyMatchingProgEstimator, \
-    EnergyMatchingProgEstimator
+    EnergyMatchingProgEstimator, OptimalEnergyMatchingEstimator
 from dataclasses import dataclass, field
 from typing import List, Any
 
@@ -36,6 +36,9 @@ VAR_EXT = 1.5
 BIAS_EXT = 0.7      # Mean shift in external data
 BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
 
+NON_LINEAR_COVARIATES = False
+NON_LINEAR_OUTCOME = False
+
 N_RCT = 200
 N_EXT = 1000
 
@@ -58,120 +61,35 @@ class MethodPipeline:
     estimator: Any
 
 PIPELINES = [
-        # MethodPipeline(
-        #     name="EnergyMatching_NoExt",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=0),
-        #     estimator=DummyMatchingEstimator()
-        # ),
+        MethodPipeline(
+            name="EnergyMatching_NoExt",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=0),
+            estimator=DummyMatchingEstimator()
+        ),
         MethodPipeline(
             name="EnergyMatching_OPT_Estimator",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
             estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
         ),
-        # MethodPipeline(
-        #     name="EnergyMatching_OPT_Design_Estimator",
-        #     design=EnergyOptimisedDesign(),
-        #     estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
-        # ),
-        # MethodPipeline(
-        #     name="EnergyWeighting",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-        #     estimator=EnergyWeightingEstimator(n_iter=1000)
-        # ),
-        # MethodPipeline(
-        #     name="PrognosticEnergyWeighting",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-        #     estimator=PrognosticEnergyWeightingEstimator(lamb=0.005, n_iter_weights=1000)
-        # ),
-        # MethodPipeline(
-        #     name="ebal",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-        #     estimator=REstimator(r_script_path="R/ebal.R", r_func_name="estimate_ebal")
-        # ),
-        # MethodPipeline(
-        #     name="CBPS",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-        #     estimator=REstimator(r_script_path="R/CBPS.R", r_func_name="estimate_cbps")
-        # ),
-        # MethodPipeline(
-        #     name="MatchIt_NN_CBPS",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-        #     estimator=REstimator(r_script_path="R/MatchIt_NN_CBPS.R", r_func_name="estimate_matchit_NN_CBPS")
-        # ),
-        # MethodPipeline(
-        #     name="MatchIt_Full_CBPS",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-        #     estimator=REstimator(r_script_path="R/MatchIt_Full_CBPS.R", r_func_name="estimate_matchit_Full_CBPS")
-        # ),
-        # MethodPipeline(
-        #     name="MatchIt_Opt_CBPS",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-        #     estimator=REstimator(r_script_path="R/MatchIt_Opt_CBPS.R", r_func_name="estimate_matchit_Opt_CBPS")
-        # ),
         MethodPipeline(
-            name="EnergyMatching_OptProg",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=OptimalEnergyMatchingProgEstimator(step=3, k_best=50, max_external=150)
+            name="EnergyMatching_OPT_Design_Estimator",
+            design=EnergyOptimisedDesign(),
+            estimator=OptimalEnergyMatchingEstimator(step=3, k_best=50, max_external=150)
         ),
         MethodPipeline(
-            name="EnergyMatching_prog_10",
+            name="EnergyWeighting",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=10, lamb=0.15)
+            estimator=EnergyWeightingEstimator(n_iter=1000)
         ),
         MethodPipeline(
-            name="EnergyMatching_prog_20",
+            name="ebal",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=20, lamb=0.15)
+            estimator=REstimator(r_script_path="R/ebal.R", r_func_name="estimate_ebal")
         ),
         MethodPipeline(
-            name="EnergyMatching_prog_30",
+            name="CBPS",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=30, lamb=0.15)
-        ),
-        MethodPipeline(
-            name="EnergyMatching_prog_40",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=40, lamb=0.15)
-        ),
-        MethodPipeline(
-            name="EnergyMatching_prog_50",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=50, lamb=0.15)
-        ),
-        MethodPipeline(
-            name="EnergyMatching_prog_60",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=60, lamb=0.15)
-        ),
-        MethodPipeline(
-            name="EnergyMatching_prog_70",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=70, lamb=0.15)
-        ),
-        MethodPipeline(
-            name="EnergyMatching_prog_80",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=80, lamb=0.15)
-        ),
-        MethodPipeline(
-            name="EnergyMatching_prog_90",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=90, lamb=0.15)
-        ),
-        MethodPipeline(
-            name="EnergyMatching_prog_100",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=100, lamb=0.15)
-        ),
-        MethodPipeline(
-            name="EnergyMatching_prog_110",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=110, lamb=0.15)
-        ),
-        MethodPipeline(
-            name="EnergyMatching_prog_120",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=1),
-            estimator=EnergyMatchingProgEstimator(n_external=120, lamb=0.15)
+            estimator=REstimator(r_script_path="R/CBPS.R", r_func_name="estimate_cbps")
         ),
     ]
 # ----------------------
@@ -206,7 +124,7 @@ class SimLog:
             "Check (Bias^2+Var)": bias**2 + variance
         }
 
-def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, corr, treatment_effect, pipelines):
+def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, corr, treatment_effect, pipelines, non_linear_covariates, non_linear_outcome):
     """Runs a single iteration of the simulation."""
     # Ensure independent randomness per process
     rng = np.random.default_rng(seed)
@@ -214,7 +132,7 @@ def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, b
 
     beta = rng.uniform(1, 3, dim)
 
-    gen = DataGenerator(dim=dim, beta=beta)
+    gen = DataGenerator(dim=dim, beta=beta, non_linear_covariates=non_linear_covariates, non_linear_outcome=non_linear_outcome)
     
     # 1. Generate Data
     rct_data = gen.generate_rct_pool(n=n_rct, mean=mean_rct, var=var_rct, corr=corr, treatment_effect=treatment_effect)
@@ -269,7 +187,9 @@ def run_monte_carlo(n_sims=100, seed=None):
             beta_bias_ext=BETA_BIAS_EXT,
             corr=CORR,
             treatment_effect=TREATMENT_EFFECT,
-            pipelines=PIPELINES
+            pipelines=PIPELINES,
+            non_linear_covariates=NON_LINEAR_COVARIATES,
+            non_linear_outcome=NON_LINEAR_OUTCOME
         ) for seed in seeds
     )
 
