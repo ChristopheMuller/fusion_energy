@@ -140,18 +140,13 @@ def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, b
 
     results = {}
     
-    # Generate a specific seed for splitting to ensure consistency across methods
-    # We use a large integer derived from the main rng
     split_seed = rng.integers(0, 2**63 - 1)
     
     for pipe in pipelines:
-        # Create a fresh RNG for this split call to ensure identical splitting behavior
-        # across all pipelines (provided the design parameters like ratio are compatible).
         split_rng = np.random.default_rng(split_seed)
         split_data = pipe.design.split(rct_data, ext_data, rng=split_rng)
         res = pipe.estimator.estimate(split_data)
         
-        # Metric: Energy Distance (Target vs Pooled Control)
         if res.energy_distance is None:
             res.energy_distance = compute_weighted_energy(
                 X_target=split_data.X_treat,

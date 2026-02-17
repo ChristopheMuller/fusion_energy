@@ -21,6 +21,7 @@ from .energy_prog_matching import PrognosticEnergyMatchingEstimator
 from .r_bridge import REstimator
 from .optimal_energy_matching_prog import OptimalEnergyMatchingProgEstimator
 from .energy_matching_prog import EnergyMatchingProgEstimator
+from .optimal_energyProg_matching import OptimalEnergyMatchingEstimator
 
 __all__ = [
     "BaseEstimator",
@@ -35,4 +36,5 @@ __all__ = [
     "REstimator",
     "OptimalEnergyMatchingProgEstimator",
     "EnergyMatchingProgEstimator",
+    "OptimalEnergyMatchingEstimator",
 ]
