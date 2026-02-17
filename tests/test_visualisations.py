@@ -56,6 +56,8 @@ def test_plot_metric_curves(tmp_path):
             self.weights_external = weights_external
         def sum_of_weights_external(self):
             return np.sum(self.weights_external)
+        def n_external_used(self):
+            return len(self.weights_external)
 
     class MockLog:
         def __init__(self, results):
