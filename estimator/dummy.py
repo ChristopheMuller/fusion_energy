@@ -3,7 +3,7 @@ import time
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
 
-class DummyMatchingEstimator(BaseEstimator):
+class Dummy_MatchingEstimator(BaseEstimator):
     """
     Randomly selects a subset of external controls.
     Serves as a baseline (dummy) estimator.

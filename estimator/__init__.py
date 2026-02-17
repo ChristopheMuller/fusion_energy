@@ -3,38 +3,38 @@ Estimator classes for treatment effect estimation.
 
 This module contains methods to estimate the Average Treatment Effect (ATE)
 or Average Treatment Effect on the Treated (ATT) given a split dataset.
-
-Classes:
-- EnergyMatchingEstimator: Matches external controls using Energy Distance minimization.
-- DummyMatchingEstimator: Randomly selects external controls (Baseline).
 """
 
 from .base import BaseEstimator
-from .energy_matching import EnergyMatchingEstimator
-from .dummy import DummyMatchingEstimator
-from .energy_weighting import EnergyWeightingEstimator
-from .optimal_energy_matching import OptimalEnergyMatchingEstimator
-from .ipw import IPWEstimator
-from .energy_pooled_weighting import EnergyPooledWeightingEstimator
-from .prognostic_energy_weighting import PrognosticEnergyWeightingEstimator
-from .energy_prog_matching import PrognosticEnergyMatchingEstimator
+from .dummy import Dummy_MatchingEstimator
+
+from .energy_weighting import Energy_WeightingEstimator
+from .energy_matching import Energy_MatchingEstimator
+from .optimal_energy_matching import Optimal_Energy_MatchingEstimator
+
+# from .energyProg_weighting import EnergyProg_WeightingEstimator
+# from .energyProg_matching import EnergyProg_MatchingEstimator
+
+# from .optimal_energy_matching_prog import Optimal_EnergyMatchingProgEstimator
+# from .energy_matching_prog import EnergyProg_MatchingEstimator
+# from .optimal_energyProg_matching import Optimal_Energy_MatchingEstimator
+
 from .r_bridge import REstimator
-from .optimal_energy_matching_prog import OptimalEnergyMatchingProgEstimator
-from .energy_matching_prog import EnergyMatchingProgEstimator
-from .optimal_energyProg_matching import OptimalEnergyMatchingEstimator
 
 __all__ = [
     "BaseEstimator",
-    "EnergyMatchingEstimator",
-    "DummyMatchingEstimator",
-    "EnergyWeightingEstimator",
-    "OptimalEnergyMatchingEstimator",
-    "IPWEstimator",
-    "EnergyPooledWeightingEstimator",
-    "PrognosticEnergyWeightingEstimator",
-    "PrognosticEnergyMatchingEstimator",
+    "Dummy_MatchingEstimator",
+
+    "Energy_WeightingEstimator",
+    "Energy_MatchingEstimator",
+    "Optimal_Energy_MatchingEstimator",
+
+    # "EnergyProg_WeightingEstimator",
+    # "EnergyProg_MatchingEstimator",
+
+    # "Optimal_EnergyMatchingProgEstimator",
+    # "EnergyProg_MatchingEstimator",
+    # "Optimal_EnergyMatchingEstimator",
+
     "REstimator",
-    "OptimalEnergyMatchingProgEstimator",
-    "EnergyMatchingProgEstimator",
-    "OptimalEnergyMatchingEstimator",
 ]

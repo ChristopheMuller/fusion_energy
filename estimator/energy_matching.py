@@ -7,7 +7,7 @@ from structures import SplitData, EstimationResult
 from metrics import optimise_soft_weights, compute_batch_energy
 from .base import BaseEstimator
 
-class EnergyMatchingEstimator(BaseEstimator):
+class Energy_MatchingEstimator(BaseEstimator):
     """
     Selects a subset of external controls that minimizes the Energy Distance 
     between the pooled control arm (Internal + Selected External) and the Treatment arm.

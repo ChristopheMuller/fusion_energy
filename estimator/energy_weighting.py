@@ -5,7 +5,7 @@ import time
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
 
-class EnergyWeightingEstimator(BaseEstimator):
+class Energy_WeightingEstimator(BaseEstimator):
     def __init__(self, lr=0.05, n_iter=300, device=None):
         super().__init__()
         self.lr = lr
