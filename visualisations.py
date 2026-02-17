@@ -273,7 +273,7 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
         # Extract results
         errors = np.array([res.bias for res in log.results])
         estimates = np.array([res.ate_est for res in log.results])
-        n_exts = np.array([res.sum_of_weights_external() for res in log.results])
+        n_exts = np.array([res.n_external_used() for res in log.results])
         energies = np.array([res.energy_distance for res in log.results])
         # energy_progs = np.array([res.energy_distance_prognostic for res in log.results if res.energy_distance_prognostic is not None])
         
