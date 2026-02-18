@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import warnings
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
 from .energy_matching import Energy_MatchingEstimator
@@ -14,8 +15,9 @@ class Optimal_Energy_MatchingEstimator(BaseEstimator):
                  step: int = 1, 
                  k_best=100, 
                  lr=0.05, 
-                 n_iter=300, 
-                 device=None):
+                 n_iter=1000, 
+                 device=None,
+                 verbose: bool = False):
         super().__init__()
         self.max_external = max_external
         self.step = step
@@ -23,8 +25,8 @@ class Optimal_Energy_MatchingEstimator(BaseEstimator):
         self.lr = lr
         self.n_iter = n_iter
         self.device = device
+        self.verbose = verbose
         
-        # We reuse the matching estimator
         self.matcher = Energy_MatchingEstimator(
             k_best=k_best, 
             lr=lr, 
@@ -33,24 +35,26 @@ class Optimal_Energy_MatchingEstimator(BaseEstimator):
         )
 
     def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
-        """
-        Iterates n_ext from 0 to max_external (step size) and finds the best using ternary search.
-        Ignores the `n_external` argument if passed, as this estimator optimizes it.
-        """
         start_time = time.time()
         
-        limit = self.max_external if self.max_external is not None else data.X_external.shape[0]
+        n_available = data.X_external.shape[0]
         
-        # If limit is 0, we can't do much, just run with 0
+        if self.max_external is not None:
+            limit = min(self.max_external, n_available)
+        else:
+            limit = n_available
+            
         if limit == 0:
+            if self.verbose: print("Limit is 0, running base estimation.")
             res = self.matcher.estimate(data, n_external=0)
             res.estimation_time = time.time() - start_time
             return res
 
-        # Candidates for n_external
-        # Ensure we include 0 and potentially the limit
-        candidates = list(range(0, limit + 1, self.step))
-        if candidates[-1] != limit:
+        safe_step = max(1, int(self.step))
+
+        candidates = list(range(0, limit + 1, safe_step))
+
+        if candidates[-1] < limit:
             candidates.append(limit)
             
         memo = {}
@@ -63,10 +67,16 @@ class Optimal_Energy_MatchingEstimator(BaseEstimator):
             try:
                 res = self.matcher.estimate(data, n_external=n)
                 energy = res.energy_distance
+                
+                if np.isnan(energy):
+                    warnings.warn(f"NaN energy detected at n={n}")
+                    energy = float('inf')
+                    
                 memo[n] = (energy, res)
                 return energy
             except Exception as e:
-                print(f"Warning: EnergyMatchingEstimator failed for n_external={n}: {e}")
+                if self.verbose:
+                    print(f"Warning: Estimation failed for n_external={n}: {e}")
                 return float('inf')
 
         # Ternary Search for U-shaped energy curve
@@ -86,21 +96,27 @@ class Optimal_Energy_MatchingEstimator(BaseEstimator):
                 
         best_result = None
         min_energy = float('inf')
+        best_n = -1
         
         for i in range(left, right + 1):
             n = candidates[i]
-            # Ensure computed
-            if n not in memo:
-                get_energy(i)
+            
+            # Ensure computed (if brute forcing, this computes it now)
+            energy = get_energy(i)
                 
             if n in memo:
                 energy, res = memo[n]
                 if energy < min_energy:
                     min_energy = energy
                     best_result = res
+                    best_n = n
             
         if best_result is None:
-            raise RuntimeError("Could not find any valid estimation result.")
+            raise RuntimeError("Optimal Energy Matching failed: All candidate attempts failed or returned infinity.")
             
         best_result.estimation_time = time.time() - start_time
+        
+        if self.verbose:
+            print(f"Optimal found: n_external={best_n} with Energy={min_energy:.6f}")
+            
         return best_result
