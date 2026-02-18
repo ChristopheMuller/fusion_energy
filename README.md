@@ -48,7 +48,7 @@ The simulation (`main.py`) runs several pipelines (i.e. combinations of Design a
 
 ## Replication
 
-### Python Environment (Recommended)
+### Python Environment
 This project is managed with `uv`, a fast Python package manager.
 
 1.  **Install uv:**
