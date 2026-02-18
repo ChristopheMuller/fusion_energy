@@ -292,27 +292,24 @@ def plot_energy_distance(logs: Dict[str, Any], filename="plots/energy_distance.p
     print(f"Saved Energy Distance plot to {filename}")
 
 
-def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png"):
+def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.pdf"):
     """
-    Generates a line plot of Bias^2, Variance, MSE, and Energy Distance
-    against the average number of external data points used.
-
-    Args:
-        logs: Dictionary mapping method names to SimLog objects.
-        filename: Path to save the plot.
+    Generates a high-quality line plot of Bias^2, Variance, MSE, and Energy Distance
+    against the average number of external data points used, in academic style.
     """
     import numpy as np
-    
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    import os
+
     data = []
     for method_name, log in logs.items():
-        # Extract results
         errors = np.array([res.bias for res in log.results])
         estimates = np.array([res.ate_est for res in log.results])
         n_exts = np.array([res.n_external_used() for res in log.results])
         energies = np.array([res.energy_distance for res in log.results])
-        # energy_progs = np.array([res.energy_distance_prognostic for res in log.results if res.energy_distance_prognostic is not None])
         
-        # Compute metrics
         avg_n_ext = np.mean(n_exts)
         bias_val = np.mean(errors)
         squared_bias = bias_val**2
@@ -326,57 +323,69 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
             "Squared Bias": squared_bias,
             "Variance": variance,
             "MSE": mse,
-            "Energy": avg_energy,
-            # "Energy_Prognostic": np.mean(energy_progs) if energy_progs.size > 0 else 0.0
+            "Energy": avg_energy
         })
     
     df = pd.DataFrame(data).sort_values("Avg_N_Ext")
     
-    min_mse_row = df.loc[df["MSE"].idxmin()]
-    min_energy_row = df.loc[df["Energy"].idxmin()]
-
-    fig, ax1 = plt.subplots(figsize=(12, 8))
+    # Visual Style Setup
+    sns.set_context("paper", font_scale=1.4)
+    sns.set_style("whitegrid")
     
-    # Plot MSE components on left axis
-    ax1.plot(df["Avg_N_Ext"], df["Squared Bias"], marker='o', label='Bias^2', color='salmon')
-    ax1.plot(df["Avg_N_Ext"], df["Variance"], marker='s', label='Variance', color='skyblue')
-    ax1.plot(df["Avg_N_Ext"], df["MSE"], marker='d', label='MSE', color='green', linewidth=2)
+    color_var = "#4c72b0"  # Muted Blue
+    color_bias = "#c44e52" # Muted Red
+    color_mse = "#55a868"  # Muted Green
+    color_energy = "#8172b3" # Muted Purple
+
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    
+    # Plot MSE components on Primary Axis
+    ax1.plot(df["Avg_N_Ext"], df["Squared Bias"], marker='o', label='Bias$^2$', 
+             color=color_bias, linewidth=1.5, markersize=6, alpha=0.9)
+    ax1.plot(df["Avg_N_Ext"], df["Variance"], marker='s', label='Variance', 
+             color=color_var, linewidth=1.5, markersize=6, alpha=0.9)
+    ax1.plot(df["Avg_N_Ext"], df["MSE"], marker='d', label='Total MSE', 
+             color=color_mse, linewidth=2.5, markersize=7)
     
     # Highlight Min MSE
+    min_mse_row = df.loc[df["MSE"].idxmin()]
     ax1.scatter(min_mse_row["Avg_N_Ext"], min_mse_row["MSE"], 
-                color='darkgreen', s=200, zorder=10, marker='*', 
-                label=f'Min MSE ({min_mse_row["Avg_N_Ext"]:.1f})')
+                color=color_mse, s=150, zorder=10, marker='*', 
+                edgecolor='black', label=f'Min MSE ($n = {min_mse_row["Avg_N_Ext"]:.0f}$)')
 
-    ax1.set_xlabel('Average External Data Points (Sum of weights)')
-    ax1.set_ylabel('MSE Metrics')
-    ax1.grid(True, linestyle='--', alpha=0.5)
+    ax1.set_xlabel('Avg. External Units (Sample Size)', fontweight='bold')
+    ax1.set_ylabel('MSE Metrics', fontweight='bold')
     
     # Create twin axis for Energy Distance
     ax2 = ax1.twinx()
-    ax2.plot(df["Avg_N_Ext"], df["Energy"], marker='x', label='Energy Distance', color='mediumpurple', linestyle='--')
+    ax2.plot(df["Avg_N_Ext"], df["Energy"], marker='x', label='Energy Distance', 
+             color=color_energy, linestyle='--', linewidth=1.5, markersize=6)
     
     # Highlight Min Energy
+    min_energy_row = df.loc[df["Energy"].idxmin()]
     ax2.scatter(min_energy_row["Avg_N_Ext"], min_energy_row["Energy"], 
-                color='indigo', s=200, zorder=10, marker='*', 
-                label=f'Min Energy ({min_energy_row["Avg_N_Ext"]:.1f})')
+                color=color_energy, s=150, zorder=10, marker='*', 
+                edgecolor='black', label=f'Min Energy ($n = {min_energy_row["Avg_N_Ext"]:.0f}$)')
 
-    ax2.set_ylabel('Energy Distance', color='mediumpurple')
-    ax2.tick_params(axis='y', labelcolor='mediumpurple')
+    ax2.set_ylabel('Energy Distance', color=color_energy, fontweight='bold')
+    ax2.tick_params(axis='y', labelcolor=color_energy)
+    ax2.grid(False) # Prevent grid overlapping from the second axis
 
-    # if df["Energy_Prognostic"].any():
-    #     ax2.plot(df["Avg_N_Ext"], df["Energy_Prognostic"]/10, marker='x', label='Energy Distance (Prognostic)', color='orange', linestyle='--')
-    
-    plt.title('Performance Metrics vs. External Data Sample Size')
-    
-    # Unified legend
+    # Formatting and Cleanup
+    sns.despine(ax=ax1, left=False, right=False, top=True, bottom=False)
+    ax1.grid(axis='y', linestyle='--', alpha=0.4)
+    ax1.grid(axis='x', visible=False)
+
+    # Unified Legend (Combining ax1 and ax2 handles)
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', 
+               frameon=True, framealpha=0.95, edgecolor='black', fontsize=10)
     
     plt.tight_layout()
     
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    plt.savefig(filename)
+    plt.savefig(filename, bbox_inches='tight')
     plt.close()
     print(f"Saved metric curves plot to {filename}")
 
