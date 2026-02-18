@@ -48,7 +48,7 @@ The simulation (`main.py`) runs several pipelines (i.e. combinations of Design a
 
 ## Replication
 
-### Using `uv` (Recommended)
+### Python Environment
 This project is managed with `uv`, a fast Python package manager.
 
 1.  **Install uv:**
@@ -62,6 +62,18 @@ This project is managed with `uv`, a fast Python package manager.
 3.  **Run the Simulation:**
     ```bash
     uv run main.py
+    ```
+
+### R Environment
+Some estimators are implemented in R and require a properly configured R environment. The Python code interacts with R via `rpy2`, which depends on these packages being available.
+
+1.  **Install renv:**
+    ```bash
+    Rscript -e "install.packages('renv')"
+    ```
+2.  **Restore R Packages:**
+    ```bash
+    Rscript -e "renv::restore()"
     ```
 
 ### Testing
