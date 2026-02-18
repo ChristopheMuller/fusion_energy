@@ -87,6 +87,11 @@ PIPELINES = [
             estimator=REstimator(r_script_path="R/CBPS.R", r_func_name="estimate_cbps")
         ),
         MethodPipeline(
+            name="R_ew",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
+            estimator=REstimator(r_script_path="R/WeightIt.R", r_func_name="estimate_ew")
+        ),
+        MethodPipeline(
             name="EnergyProg_Weighting",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
             estimator=EnergyProg_WeightingEstimator()
