@@ -3,6 +3,11 @@ import seaborn as sns
 import pandas as pd
 import os
 from typing import Dict, Any
+import numpy as np
+
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+
 
 def plot_error_boxplots(logs: Dict[str, Any], filename="plots/error_boxplots.png"):
     """
@@ -35,23 +40,13 @@ def plot_error_boxplots(logs: Dict[str, Any], filename="plots/error_boxplots.png
     plt.close()
     print(f"Saved boxplot to {filename}")
 
-def plot_mse_decomposition(logs: Dict[str, Any], filename="plots/mse_decomposition.png"):
-    """
-    Generates a stacked bar chart of MSE decomposed into Squared Bias and Variance.
-    
-    Args:
-        logs: Dictionary mapping method names to SimLog objects.
-        filename: Path to save the plot.
-    """
-    import numpy as np
-    
+def plot_mse_decomposition(logs: Dict[str, Any], filename="plots/mse_decomposition.pdf"):
+
     data = []
     for method_name, log in logs.items():
-        # Extract results
         errors = np.array([res.bias for res in log.results])
         estimates = np.array([res.ate_est for res in log.results])
         
-        # Compute metrics
         bias_val = np.mean(errors)
         squared_bias = bias_val**2
         variance = np.var(estimates)
@@ -66,30 +61,70 @@ def plot_mse_decomposition(logs: Dict[str, Any], filename="plots/mse_decompositi
     
     df = pd.DataFrame(data)
     
-    # Plotting
-    plt.figure(figsize=(12, 8))
+    sns.set_context("paper", font_scale=1.4)
+    sns.set_style("whitegrid")
     
-    # Create stacked bars
-    # We plot Variance at the bottom, Squared Bias on top
-    p1 = plt.bar(df["Method"], df["Variance"], label='Variance', color='skyblue', alpha=0.8)
-    p2 = plt.bar(df["Method"], df["Squared Bias"], bottom=df["Variance"], label='Squared Bias', color='salmon', alpha=0.8)
+    fig, ax = plt.subplots(figsize=(10, 6))
     
-    plt.ylabel('Mean Squared Error')
-    plt.title('MSE Decomposition: Squared Bias + Variance')
+    color_var = "#4c72b0"
+    color_bias = "#c44e52"
+    
+    # Plot Variance (Bottom)
+    p1 = ax.bar(
+        df["Method"], 
+        df["Variance"], 
+        label='Variance', 
+        color=color_var, 
+        edgecolor='black', 
+        linewidth=0.8, 
+        alpha=0.9
+    )
+    
+    # Plot Squared Bias (Top)
+    p2 = ax.bar(
+        df["Method"], 
+        df["Squared Bias"], 
+        bottom=df["Variance"], 
+        label='Squared Bias', 
+        color=color_bias, 
+        edgecolor='black', 
+        linewidth=0.8, 
+        alpha=0.9
+    )
+    
+    ax.set_ylabel('Mean Squared Error (MSE)', fontweight='bold')
+    ax.set_xlabel('')
+    
     plt.xticks(rotation=45, ha='right')
-    plt.legend()
-    plt.grid(axis='y', linestyle='--', alpha=0.5)
     
-    # Add text labels for MSE
+    sns.despine(left=True, bottom=False)
+    ax.grid(axis='y', linestyle='--', alpha=0.4)
+    ax.grid(axis='x', visible=False)
+
+    ax.legend(loc='upper right', frameon=True, framealpha=0.95, edgecolor='black')
+
+    max_height = df["MSE"].max()
     for i, row in enumerate(df.itertuples()):
         total_height = row.MSE
-        plt.text(i, total_height + (0.01 * max(df["MSE"])), f"{total_height:.3f}", 
-                 ha='center', va='bottom', fontsize=9)
+        # Add a small buffer above the bar for the text
+        text_y = total_height + (0.02 * max_height)
+        ax.text(
+            i, 
+            text_y, 
+            f"{total_height:.3f}", 
+            ha='center', 
+            va='bottom', 
+            fontsize=10, 
+            color='black', 
+            fontweight='medium'
+        )
 
     plt.tight_layout()
     
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    plt.savefig(filename)
+    
+    # No need for DPI in PDF, but bbox_inches='tight' is essential
+    plt.savefig(filename, bbox_inches='tight')
     plt.close()
     print(f"Saved MSE decomposition plot to {filename}")
 
@@ -297,7 +332,6 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.png")
     
     df = pd.DataFrame(data).sort_values("Avg_N_Ext")
     
-    # Identify minima
     min_mse_row = df.loc[df["MSE"].idxmin()]
     min_energy_row = df.loc[df["Energy"].idxmin()]
 

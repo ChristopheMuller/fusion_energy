@@ -33,14 +33,14 @@ VAR_RCT = 1.0
 CORR = 0.3
 
 VAR_EXT = 1.5
-BIAS_EXT = 0.7      # Mean shift in external data
-BETA_BIAS_EXT = 0.0 # Coefficient shift in external data
+BIAS_EXT = 0.7
+BETA_BIAS_EXT = 0.0
 
 NON_LINEAR_COVARIATES = True
 NON_LINEAR_OUTCOME = True
 
 N_RCT = 200
-N_EXT = 1000
+N_EXT = 1500
 
 # -------------------------
 
@@ -62,50 +62,110 @@ class MethodPipeline:
 
 PIPELINES = [
         MethodPipeline(
-            name="NoExt",
+            name="RCT Only",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=0),
             estimator=Dummy_MatchingEstimator()
         ),
+        # MethodPipeline(
+        #     name="Energy_Weighting",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
+        #     estimator=Energy_WeightingEstimator()
+        # ),
         MethodPipeline(
-            name="Energy_Weighting",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
-            estimator=Energy_WeightingEstimator()
-        ),
-        MethodPipeline(
-            name="Optimal_Energy_Matching",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
-            estimator=Optimal_Energy_MatchingEstimator(max_external=150, step=3)
-        ),
-        MethodPipeline(
-            name="R_ebal",
+            name="EBAL",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
             estimator=REstimator(r_script_path="R/ebal.R", r_func_name="estimate_ebal")
         ),
         MethodPipeline(
-            name="R_cbps",
+            name="CBPS",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
             estimator=REstimator(r_script_path="R/CBPS.R", r_func_name="estimate_cbps")
         ),
         MethodPipeline(
-            name="R_ew",
+            name="EW",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
             estimator=REstimator(r_script_path="R/WeightIt.R", r_func_name="estimate_ew")
         ),
         MethodPipeline(
-            name="EnergyProg_Weighting",
+            name="EM (Proposed)",
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
-            estimator=EnergyProg_WeightingEstimator()
+            estimator=Optimal_Energy_MatchingEstimator(max_external=170, step=1)
         ),
-        MethodPipeline(
-            name="EnergyProg_Matching",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=30),
-            estimator=EnergyProg_MatchingEstimator()
-        ),
-        MethodPipeline(
-            name="OptimalProg_Energy_Matching",
-            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
-            estimator=OptimalProg_Energy_MatchingEstimator(max_external=150, step=3)
-        ),
+        # MethodPipeline(
+        #     name="Matching_10",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=10),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_20",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=20),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_30",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=30),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_40",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=40),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_50",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=50),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_60",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=60),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_70",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=70),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_80",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=80),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_90",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=90),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_100",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=100),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_110",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=110),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_120",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=120),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_130",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=130),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_140",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=140),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="OptimalProg_Energy_Matching",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
+        #     estimator=OptimalProg_Energy_MatchingEstimator(max_external=170, step=1)
+        # )
 ]
 # ----------------------
 
@@ -162,13 +222,12 @@ def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, b
         split_data = pipe.design.split(rct_data, ext_data, rng=split_rng)
         res = pipe.estimator.estimate(split_data)
         
-        if res.energy_distance is None:
-            res.energy_distance = compute_weighted_energy(
-                X_target=split_data.X_treat,
-                X_internal=split_data.X_control_int,
-                X_external=split_data.X_external,
-                weights_external=res.weights_external
-            )
+        res.energy_distance = compute_weighted_energy(
+            X_target=split_data.X_treat,
+            X_internal=split_data.X_control_int,
+            X_external=split_data.X_external,
+            weights_external=res.weights_external
+        )
         
         results[pipe.name] = res
     
@@ -184,7 +243,7 @@ def run_monte_carlo(n_sims=100, seed=None):
     rng = np.random.default_rng(seed)
     seeds = rng.integers(0, 1000000, size=n_sims)
 
-    parallel_results = Parallel(n_jobs=10, verbose=5)(
+    parallel_results = Parallel(n_jobs=-1, verbose=5)(
         delayed(run_single_simulation)(
             seed=seed,
             dim=DIM,
