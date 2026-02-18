@@ -8,7 +8,7 @@ def optimise_soft_weights(
     X_internal: torch.Tensor = None,
     target_n_aug: int = None,
     lr: float = 0.05,
-    n_iter: int = 300,
+    n_iter: int = 1000,
     dist_st: torch.Tensor = None,
     dist_ss: torch.Tensor = None,
     dist_is: torch.Tensor = None
@@ -84,6 +84,7 @@ def optimise_soft_weights(
     # optimisation
     logits = torch.zeros(n_source, requires_grad=True, device=X_source.device)
     opt = torch.optim.Adam([logits], lr=lr)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=n_iter, eta_min=lr*0.01)
     
     prev_loss = float('inf')
     for _ in range(n_iter):
@@ -111,7 +112,8 @@ def optimise_soft_weights(
             
         loss.backward()
         opt.step()
-        if abs(prev_loss - loss.item()) < 1e-6:
+        scheduler.step()
+        if abs(prev_loss - loss.item()) < 1e-8:
             break
         prev_loss = loss.item()
         

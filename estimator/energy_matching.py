@@ -12,7 +12,7 @@ class Energy_MatchingEstimator(BaseEstimator):
     Selects a subset of external controls that minimizes the Energy Distance 
     between the pooled control arm (Internal + Selected External) and the Treatment arm.
     """
-    def __init__(self, k_best=100, lr=0.05, n_iter=300, device=None, n_external: int = None):
+    def __init__(self, k_best=300, lr=0.05, n_iter=1000, device=None, n_external: int = None):
         super().__init__(n_external=n_external)
         self.k_best = k_best
         self.lr = lr
