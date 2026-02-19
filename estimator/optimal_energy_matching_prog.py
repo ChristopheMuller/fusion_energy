@@ -9,9 +9,9 @@ class OptimalProg_Energy_MatchingEstimator(BaseEstimator):
     def __init__(self, 
                  max_external: int = None, 
                  step: int = 1, 
-                 k_best=100, 
+                 k_best=300, 
                  lr=0.05, 
-                 n_iter=300, 
+                 n_iter=1000, 
                  device=None):
         super().__init__()
         self.max_external = max_external
@@ -104,9 +104,9 @@ class OptimalProg_Energy_MatchingEstimator(BaseEstimator):
                 get_score(i)
                 
             if n in memo:
-                energy, res = memo[n]
-                if energy < min_score:
-                    min_score = energy
+                regul, res = memo[n]
+                if regul < min_score:
+                    min_score = regul
                     best_result = res
             
         if best_result is None:
