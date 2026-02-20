@@ -27,6 +27,7 @@ class EstimationResult:
     weights_external: np.ndarray
     energy_distance: float = None
     estimation_time: float = None
+    mse_regul: Optional[float] = None
 
     energy_distance_prognostic: Optional[float] = None
 

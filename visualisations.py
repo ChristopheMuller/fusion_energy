@@ -353,7 +353,7 @@ def plot_metric_curves(logs: Dict[str, Any], filename="plots/metric_curves.pdf")
                 color=color_mse, s=150, zorder=10, marker='*', 
                 edgecolor='black', label=f'Min MSE ($n = {min_mse_row["Avg_N_Ext"]:.0f}$)')
 
-    ax1.set_xlabel('Avg. External Units (Sample Size)', fontweight='bold')
+    ax1.set_xlabel('External Units', fontweight='bold')
     ax1.set_ylabel('MSE Metrics', fontweight='bold')
     
     # Create twin axis for Energy Distance
@@ -451,3 +451,126 @@ def plot_estimation_time(logs: Dict[str, Any], filename="plots/estimation_time.p
     plt.savefig(filename)
     plt.close()
     print(f"Saved estimation time plot to {filename}")
+
+
+def plot_metric_curves_with_regul(logs: Dict[str, Any], filename="plots/metric_curves_with_regul.pdf"):
+    """
+    Generates a high-quality line plot of Bias^2, Variance, MSE (left axis),
+    and normalized Energy Distance & MSE_Regul (right axis) against the 
+    average number of external data points used, in academic style.
+    """
+    import matplotlib.pyplot as plt
+
+    data = []
+    for method_name, log in logs.items():
+        errors = np.array([res.bias for res in log.results])
+        estimates = np.array([res.ate_est for res in log.results])
+        n_exts = np.array([res.n_external_used() for res in log.results])
+        energies = np.array([res.energy_distance for res in log.results])
+        mse_reguls = np.array([res.mse_regul for res in log.results])
+        
+        avg_n_ext = np.mean(n_exts)
+        bias_val = np.mean(errors)
+        squared_bias = bias_val**2
+        variance = np.var(estimates)
+        mse = squared_bias + variance
+        avg_energy = np.mean(energies)
+        avg_mse_regul = np.mean(mse_reguls)
+        
+        data.append({
+            "Method": method_name,
+            "Avg_N_Ext": avg_n_ext,
+            "Squared Bias": squared_bias,
+            "Variance": variance,
+            "MSE": mse,
+            "Energy": avg_energy,
+            "MSE_Regul": avg_mse_regul
+        })
+    
+    df = pd.DataFrame(data).sort_values("Avg_N_Ext")
+    
+    # --- Min-Max Normalization for right axis metrics ---
+    df["Energy_Norm"] = (df["Energy"] - df["Energy"].min()) / (df["Energy"].max() - df["Energy"].min())
+    
+    # Avoid division by zero in case all MSE_Regul values are identical
+    mse_regul_range = df["MSE_Regul"].max() - df["MSE_Regul"].min()
+    if mse_regul_range > 0:
+        df["MSE_Regul_Norm"] = (df["MSE_Regul"] - df["MSE_Regul"].min()) / mse_regul_range
+    else:
+        df["MSE_Regul_Norm"] = 0.0
+
+    # Visual Style Setup
+    sns.set_context("paper", font_scale=1.4)
+    sns.set_style("whitegrid")
+    
+    color_var = "#4c72b0"      # Muted Blue
+    color_bias = "#c44e52"     # Muted Red
+    color_mse = "#55a868"      # Muted Green
+    color_energy = "#8172b3"   # Muted Purple
+    color_mse_regul = "#dd8452" # Muted Orange (New)
+
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+    
+    # --- Plot Left Axis (ax1): MSE components ---
+    # ax1.plot(df["Avg_N_Ext"], df["Squared Bias"], marker='o', label='Bias$^2$', 
+    #          color=color_bias, linewidth=1.5, markersize=6, alpha=0.9)
+    # ax1.plot(df["Avg_N_Ext"], df["Variance"], marker='s', label='Variance', 
+    #          color=color_var, linewidth=1.5, markersize=6, alpha=0.9)
+    ax1.plot(df["Avg_N_Ext"], df["MSE"], marker='d', label='Total MSE', 
+             color=color_mse, linewidth=2.5, markersize=7)
+    
+    # Highlight Min MSE
+    min_mse_row = df.loc[df["MSE"].idxmin()]
+    ax1.scatter(min_mse_row["Avg_N_Ext"], min_mse_row["MSE"], 
+                color=color_mse, s=150, zorder=10, marker='*', 
+                edgecolor='black', label=f'Min MSE ($n = {min_mse_row["Avg_N_Ext"]:.0f}$)')
+
+    ax1.set_xlabel('External Units', fontweight='bold')
+    ax1.set_ylabel('MSE Metrics', fontweight='bold')
+    
+    # --- Plot Right Axis (ax2): Normalized Metrics ---
+    ax2 = ax1.twinx()
+    
+    # Energy Distance (Norm)
+    ax2.plot(df["Avg_N_Ext"], df["Energy_Norm"], marker='x', label='Energy Dist (Norm)', 
+             color=color_energy, linestyle='--', linewidth=1.5, markersize=6)
+    
+    min_energy_row = df.loc[df["Energy_Norm"].idxmin()]
+    ax2.scatter(min_energy_row["Avg_N_Ext"], min_energy_row["Energy_Norm"], 
+                color=color_energy, s=150, zorder=10, marker='*', 
+                edgecolor='black', label=f'Min Energy ($n = {min_energy_row["Avg_N_Ext"]:.0f}$)')
+
+    # MSE_Regul (Norm)
+    ax2.plot(df["Avg_N_Ext"], df["MSE_Regul_Norm"], marker='+', label='Regul MSE (Norm)', 
+             color=color_mse_regul, linestyle=':', linewidth=1.5, markersize=6)
+    
+    min_mseregul_row = df.loc[df["MSE_Regul_Norm"].idxmin()]
+    ax2.scatter(min_mseregul_row["Avg_N_Ext"], min_mseregul_row["MSE_Regul_Norm"], 
+                color=color_mse_regul, s=150, zorder=10, marker='*', 
+                edgecolor='black', label=f'Min Regul MSE ($n = {min_mseregul_row["Avg_N_Ext"]:.0f}$)')
+
+    # Formatting for ax2
+    ax2.set_ylabel('Normalized Score', color='#333333', fontweight='bold')
+    ax2.tick_params(axis='y', labelcolor='#333333')
+    ax2.grid(False) # Prevent grid overlapping from the second axis
+
+    # Formatting and Cleanup
+    sns.despine(ax=ax1, left=False, right=False, top=True, bottom=False)
+    ax1.grid(axis='y', linestyle='--', alpha=0.4)
+    ax1.grid(axis='x', visible=False)
+
+    # Unified Legend (Combining ax1 and ax2 handles)
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    
+    # Place legend slightly outside or keep upper left if it doesn't overlap
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', 
+               bbox_to_anchor=(1.08, 1), frameon=True, framealpha=0.95, 
+               edgecolor='black', fontsize=10)
+    
+    plt.tight_layout()
+    
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    plt.savefig(filename, bbox_inches='tight')
+    plt.close()
+    print(f"Saved metric curves plot to {filename}")

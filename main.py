@@ -10,6 +10,8 @@ from estimator import Dummy_MatchingEstimator, Energy_WeightingEstimator, Energy
 from dataclasses import dataclass, field
 from typing import List, Any
 
+from sklearn.ensemble import RandomForestRegressor
+
 from metrics import compute_weighted_energy
 from visualisations import (
     plot_error_boxplots, 
@@ -18,7 +20,8 @@ from visualisations import (
     plot_energy_distance,
     plot_metric_curves,
     plot_weight_ranks,
-    plot_estimation_time
+    plot_estimation_time,
+    plot_metric_curves_with_regul
 )
 
 import os
@@ -26,7 +29,7 @@ os.environ["RENV_CONFIG_SANDBOX_ENABLED"] = "FALSE"
 
 # ----- GLOBAL CONFIG ----- 
 N_SIMS = 100
-DIM = 5
+DIM = 10
 
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
@@ -91,14 +94,34 @@ PIPELINES = [
             design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
             estimator=Optimal_Energy_MatchingEstimator(max_external=170, step=1)
         ),
+        MethodPipeline(
+            name="EM-Prog (Proposed)",
+            design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
+            estimator=OptimalProg_Energy_MatchingEstimator(max_external=170, step=1)
+        ),
+        # MethodPipeline(
+        #     name="Matching_05",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=5),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
         # MethodPipeline(
         #     name="Matching_10",
         #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=10),
         #     estimator=Energy_MatchingEstimator()
         # ),
         # MethodPipeline(
+        #     name="Matching_15",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=15),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
         #     name="Matching_20",
         #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=20),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
+        # MethodPipeline(
+        #     name="Matching_25",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=25),
         #     estimator=Energy_MatchingEstimator()
         # ),
         # MethodPipeline(
@@ -162,10 +185,10 @@ PIPELINES = [
         #     estimator=Energy_MatchingEstimator()
         # ),
         # MethodPipeline(
-        #     name="OptimalProg_Energy_Matching",
-        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None),
-        #     estimator=OptimalProg_Energy_MatchingEstimator(max_external=170, step=1)
-        # )
+        #     name="Matching_150",
+        #     design=FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=150),
+        #     estimator=Energy_MatchingEstimator()
+        # ),
 ]
 # ----------------------
 
@@ -216,6 +239,7 @@ def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, b
     results = {}
     
     split_seed = rng.integers(0, 2**63 - 1)
+
     
     for pipe in pipelines:
         split_rng = np.random.default_rng(split_seed)
@@ -228,7 +252,20 @@ def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, b
             X_external=split_data.X_external,
             weights_external=res.weights_external
         )
-        
+
+        model = RandomForestRegressor(
+            n_estimators=100,
+            max_depth=5,
+            oob_score=True,
+            n_jobs=1
+        )
+        model.fit(split_data.X_external, split_data.Y_external)
+        preds_control = model.predict(split_data.X_control_int)
+        preds_external = model.oob_prediction_
+        preds_treat = model.predict(split_data.X_treat)
+
+        res.mse_regul = (np.mean(preds_treat) - (np.sum(preds_control) + np.sum(res.weights_external * preds_external)) / (len(preds_control) + np.sum(res.weights_external)))**2
+
         results[pipe.name] = res
     
     return results
@@ -243,7 +280,7 @@ def run_monte_carlo(n_sims=100, seed=None):
     rng = np.random.default_rng(seed)
     seeds = rng.integers(0, 1000000, size=n_sims)
 
-    parallel_results = Parallel(n_jobs=-1, verbose=5)(
+    parallel_results = Parallel(n_jobs=10, verbose=5)(
         delayed(run_single_simulation)(
             seed=seed,
             dim=DIM,
@@ -284,6 +321,7 @@ def run_monte_carlo(n_sims=100, seed=None):
     plot_mse_decomposition(logs)
     plot_energy_distance(logs)
     plot_metric_curves(logs)
+    plot_metric_curves_with_regul(logs)
     plot_estimation_time(logs)
 
     # Visualisations of example data
