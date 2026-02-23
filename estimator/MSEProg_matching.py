@@ -24,7 +24,7 @@ class MSEProg_MatchingEstimator(BaseEstimator):
         else:
             self.device = device
 
-    def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
+    def estimate(self, data: SplitData, n_external: int = None, **kwargs) -> EstimationResult:
         start_time = time.time()
         n_int = data.X_control_int.shape[0]
         n_ext = data.X_external.shape[0]
@@ -39,23 +39,39 @@ class MSEProg_MatchingEstimator(BaseEstimator):
         y1_mean = np.mean(data.Y_treat)
 
         # 0. Fit RF to compute prognostic scores (m)
-        rf = RandomForestRegressor(
-            n_estimators=100, 
-            max_depth=5,
-            oob_score=True,
-            n_jobs=1
-        )
-        rf.fit(data.X_external, data.Y_external)
+        m_c = kwargs.get('m_c')
+        m_e = kwargs.get('m_e')
+        m_t = kwargs.get('m_t')
         
-        # Convert m(X) to tensors for fast batched computation later
-        m_c = torch.as_tensor(rf.predict(data.X_control_int), dtype=torch.float32, device=self.device)
-        m_e = torch.as_tensor(rf.oob_prediction_, dtype=torch.float32, device=self.device)
-        m_t = torch.as_tensor(rf.predict(data.X_treat), dtype=torch.float32, device=self.device)
+        if m_c is None or m_e is None or m_t is None:
+            rf = RandomForestRegressor(
+                n_estimators=100,
+                max_depth=5,
+                oob_score=True,
+                n_jobs=1
+            )
+            rf.fit(data.X_external, data.Y_external)
+
+            # Convert m(X) to tensors for fast batched computation later
+            if m_c is None:
+                m_c = torch.as_tensor(rf.predict(data.X_control_int), dtype=torch.float32, device=self.device)
+            if m_e is None:
+                m_e = torch.as_tensor(rf.oob_prediction_, dtype=torch.float32, device=self.device)
+            if m_t is None:
+                m_t = torch.as_tensor(rf.predict(data.X_treat), dtype=torch.float32, device=self.device)
         
         # 1. Tensor Setup for Covariates
-        X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
-        X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
-        X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
+        X_t = kwargs.get('X_t')
+        if X_t is None:
+            X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
+
+        X_c = kwargs.get('X_c')
+        if X_c is None:
+            X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
+
+        X_e = kwargs.get('X_e')
+        if X_e is None:
+            X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
 
         logits = self._optimise_soft_weights(
             X_source=X_e,
@@ -64,15 +80,22 @@ class MSEProg_MatchingEstimator(BaseEstimator):
             target_n_aug=target_n,
             m_e=m_e,
             m_t=m_t,
-            m_c=m_c
+            m_c=m_c,
+            dist_st=kwargs.get('dist_st'),
+            dist_ss=kwargs.get('dist_ss'),
+            dist_is=kwargs.get('dist_is'),
+            dist_st_sum=kwargs.get('dist_st_sum'),
+            dist_is_sum=kwargs.get('dist_is_sum')
         )
         probs = F.softmax(logits, dim=0).cpu().numpy()
         probs /= probs.sum()
         
         # 3. Select Best Sample (Stochastic Selection)
         # We pick the specific binary subset that minimizes energy
+        # Avoid double-passing already passed arguments
+        pass_kwargs = {k: v for k, v in kwargs.items() if k not in ['X_t', 'X_c', 'X_e', 'm_t', 'm_c', 'm_e']}
         best_indices, min_loss = self._select_best_sample(
-            X_t, X_c, X_e, probs, target_n, m_t, m_c, m_e
+            X_t, X_c, X_e, probs, target_n, m_t, m_c, m_e, **pass_kwargs
         )
         
         # 4. Construct Estimation Result
@@ -104,16 +127,19 @@ class MSEProg_MatchingEstimator(BaseEstimator):
         m_c: torch.Tensor = None,
         dist_st: torch.Tensor = None,
         dist_ss: torch.Tensor = None,
-        dist_is: torch.Tensor = None
+        dist_is: torch.Tensor = None,
+        dist_st_sum: torch.Tensor = None,
+        dist_is_sum: torch.Tensor = None
     ):
         n_source = X_source.shape[0]
         n_target = X_target.shape[0]
         
-        if dist_st is not None:
-            d_st = dist_st
+        if dist_st_sum is not None:
+            d_st_sum = dist_st_sum
+        elif dist_st is not None:
+            d_st_sum = dist_st.sum(dim=1)
         else:
-            d_st = torch.cdist(X_source, X_target)
-        d_st_sum = d_st.sum(dim=1)
+            d_st_sum = torch.cdist(X_source, X_target).sum(dim=1)
         
         if dist_ss is not None:
             d_ss = dist_ss
@@ -129,11 +155,12 @@ class MSEProg_MatchingEstimator(BaseEstimator):
             
             beta = target_n_aug / total_n if total_n > 0 else 0.5
             
-            if dist_is is not None:
-                d_is = dist_is
+            if dist_is_sum is not None:
+                d_is_sum = dist_is_sum
+            elif dist_is is not None:
+                d_is_sum = dist_is.sum(dim=0)
             else:
-                d_is = torch.cdist(X_internal, X_source)
-            d_is_sum = d_is.sum(dim=0)
+                d_is_sum = torch.cdist(X_internal, X_source).sum(dim=0)
         else:
             beta = 1.0
             n_internal = 0
@@ -178,7 +205,7 @@ class MSEProg_MatchingEstimator(BaseEstimator):
             
         return logits.detach()
 
-    def _select_best_sample(self, X_t, X_c, X_e, probs, n_sampled, m_t, m_c, m_e):
+    def _select_best_sample(self, X_t, X_c, X_e, probs, n_sampled, m_t, m_c, m_e, **kwargs):
         pool_idx = np.arange(len(probs))
         
         batch_indices = [
@@ -187,15 +214,41 @@ class MSEProg_MatchingEstimator(BaseEstimator):
         ]
         batch_idx_tensor = torch.as_tensor(np.array(batch_indices), device=self.device, dtype=torch.long)
         
-        # B. Prepare Batches
-        X_source_batch = X_e[batch_idx_tensor] # (k, n, dim)
-        
-        # C. Compute Energy (Metrics API)
-        energies = compute_batch_energy(
-            X_source_batch=X_source_batch,
-            X_target=X_t,
-            X_internal=X_c
-        )
+        dist_ss = kwargs.get('dist_ss')
+        sum_it = kwargs.get('sum_it')
+        sum_ii = kwargs.get('sum_ii')
+        dist_st_sum = kwargs.get('dist_st_sum')
+        dist_is_sum = kwargs.get('dist_is_sum')
+
+        if dist_st_sum is not None and dist_ss is not None and (X_c is None or (dist_is_sum is not None and sum_it is not None and sum_ii is not None)):
+            # Optimized path using precomputed distances
+            sum_st = dist_st_sum[batch_idx_tensor].sum(dim=1)
+            sum_ss = dist_ss[batch_idx_tensor.unsqueeze(-1), batch_idx_tensor.unsqueeze(1)].sum(dim=(1, 2))
+
+            if X_c is not None:
+                n_i = X_c.shape[0]
+                n_pool = n_i + n_sampled
+                sum_is = dist_is_sum[batch_idx_tensor].sum(dim=1)
+
+                term_cross = (sum_it + sum_st) / (n_pool * X_t.shape[0])
+                term_self = (sum_ii + sum_ss + 2 * sum_is) / (n_pool**2)
+                energies = 2 * term_cross - term_self
+            else:
+                term_cross = sum_st / (n_sampled * X_t.shape[0])
+                term_self = sum_ss / (n_sampled**2)
+                energies = 2 * term_cross - term_self
+        else:
+            # B. Prepare Batches
+            X_source_batch = X_e[batch_idx_tensor] # (k, n, dim)
+
+            # C. Compute Energy (Metrics API)
+            energies = compute_batch_energy(
+                X_source_batch=X_source_batch,
+                X_target=X_t,
+                X_internal=X_c,
+                sum_it=sum_it,
+                sum_ii=sum_ii
+            )
         
         m_e_batch = m_e[batch_idx_tensor] 
         

@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import time
 from sklearn.ensemble import RandomForestRegressor
 from structures import SplitData, EstimationResult
@@ -35,6 +36,36 @@ class OptimalProg_Energy_MatchingEstimator(BaseEstimator):
         Ignores the `n_external` argument if passed, as this estimator optimizes it.
         """
         start_time = time.time()
+
+        # 1. Precompute Tensors and Distance Matrices
+        device = self.device if self.device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=device)
+        X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=device)
+        X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=device)
+
+        dist_st = torch.cdist(X_e, X_t)
+        dist_ss = torch.cdist(X_e, X_e)
+        dist_is = torch.cdist(X_c, X_e)
+
+        dist_st_sum = dist_st.sum(dim=1)
+        dist_is_sum = dist_is.sum(dim=0)
+
+        sum_it = torch.cdist(X_c, X_t).sum()
+        sum_ii = torch.cdist(X_c, X_c).sum()
+
+        precomputed = {
+            'X_t': X_t,
+            'X_c': X_c,
+            'X_e': X_e,
+            'dist_st': dist_st,
+            'dist_ss': dist_ss,
+            'dist_is': dist_is,
+            'dist_st_sum': dist_st_sum,
+            'dist_is_sum': dist_is_sum,
+            'sum_it': sum_it,
+            'sum_ii': sum_ii
+        }
         
         limit = self.max_external if self.max_external is not None else data.X_external.shape[0]
         
@@ -70,7 +101,7 @@ class OptimalProg_Energy_MatchingEstimator(BaseEstimator):
                 return memo[n][0]
             
             try:
-                res = self.matcher.estimate(data, n_external=n)
+                res = self.matcher.estimate(data, n_external=n, **precomputed)
                 w_ext = res.weights_external
                 
                 estim_YControl = np.sum(m_internal_control) + np.sum(w_ext * m_external_oob)

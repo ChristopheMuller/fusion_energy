@@ -11,7 +11,9 @@ def optimise_soft_weights(
     n_iter: int = 1000,
     dist_st: torch.Tensor = None,
     dist_ss: torch.Tensor = None,
-    dist_is: torch.Tensor = None
+    dist_is: torch.Tensor = None,
+    dist_st_sum: torch.Tensor = None,
+    dist_is_sum: torch.Tensor = None
 ):
     """
     Optimises soft weights (logits) for X_source to minimize Energy Distance.
@@ -48,11 +50,12 @@ def optimise_soft_weights(
     
     # Precompute distances
     # d_st: Source -> Target
-    if dist_st is not None:
-        d_st = dist_st
+    if dist_st_sum is not None:
+        d_st_sum = dist_st_sum
+    elif dist_st is not None:
+        d_st_sum = dist_st.sum(dim=1)
     else:
-        d_st = torch.cdist(X_source, X_target)
-    d_st_sum = d_st.sum(dim=1) # (n_source,)
+        d_st_sum = torch.cdist(X_source, X_target).sum(dim=1)
     
     # d_ss: Source -> Source
     if dist_ss is not None:
@@ -71,11 +74,12 @@ def optimise_soft_weights(
         beta = target_n_aug / total_n if total_n > 0 else 0.5
         
         # d_is: Internal -> Source
-        if dist_is is not None:
-            d_is = dist_is
+        if dist_is_sum is not None:
+            d_is_sum = dist_is_sum
+        elif dist_is is not None:
+            d_is_sum = dist_is.sum(dim=0)
         else:
-            d_is = torch.cdist(X_internal, X_source)
-        d_is_sum = d_is.sum(dim=0) # (n_source,)
+            d_is_sum = torch.cdist(X_internal, X_source).sum(dim=0)
     else:
         beta = 1.0
         n_internal = 0
@@ -123,7 +127,9 @@ def optimise_soft_weights(
 def compute_batch_energy(
     X_source_batch: torch.Tensor, 
     X_target: torch.Tensor,       
-    X_internal: torch.Tensor = None
+    X_internal: torch.Tensor = None,
+    sum_it: torch.Tensor = None,
+    sum_ii: torch.Tensor = None
 ):
     """
     Computes Energy Distance for a batch of source subsets.
@@ -132,6 +138,8 @@ def compute_batch_energy(
         X_source_batch: (k, n_s, dim) - Batch of subset candidates.
         X_target: (n_t, dim) - Target population.
         X_internal: (n_i, dim) - Optional fixed source component.
+        sum_it: (Optional) Precomputed sum of distances between X_internal and X_target.
+        sum_ii: (Optional) Precomputed sum of distances between X_internal and X_internal.
         
     Returns:
         energies: (k,) - Energy distance for each batch.
@@ -156,8 +164,10 @@ def compute_batch_energy(
         
         # Constant Terms (Internal <-> Target, Internal <-> Internal)
         # These are scalars, computed once.
-        sum_it = torch.cdist(X_internal, X_target).sum()
-        sum_ii = torch.cdist(X_internal, X_internal).sum()
+        if sum_it is None:
+            sum_it = torch.cdist(X_internal, X_target).sum()
+        if sum_ii is None:
+            sum_ii = torch.cdist(X_internal, X_internal).sum()
         
         # Cross Internal <-> Source
         # X_internal: (n_i, dim) -> (1, n_i, dim) -> (k, n_i, dim)

@@ -50,7 +50,7 @@ class EnergyProg_MatchingEstimator(BaseEstimator):
                 
         return RFWrapper(rf, self.device)
 
-    def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
+    def estimate(self, data: SplitData, n_external: int = None, **kwargs) -> EstimationResult:
         start_time = time.time()
         
         # 1. Determine Sample Sizes & Beta
@@ -69,18 +69,31 @@ class EnergyProg_MatchingEstimator(BaseEstimator):
         beta = target_n / (target_n + n_int)
 
         # 2. Data to Tensor
-        X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
-        X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
-        X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
+        X_t = kwargs.get('X_t')
+        if X_t is None:
+            X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
+
+        X_c = kwargs.get('X_c')
+        if X_c is None:
+            X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
+
+        X_e = kwargs.get('X_e')
+        if X_e is None:
+            X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
+
         Y_e = torch.as_tensor(data.Y_external, dtype=torch.float32, device=self.device).view(-1, 1)
 
         # 3. Prognostic Model
         # Train and store
-        self.prog_model = self._train_prognostic_model(X_e, Y_e)
-        
-        with torch.no_grad():
-            m_c = self.prog_model(X_c) 
-            m_e = self.prog_model(X_e)
+        m_c = kwargs.get('m_c')
+        m_e = kwargs.get('m_e')
+        if m_c is None or m_e is None:
+            self.prog_model = self._train_prognostic_model(X_e, Y_e)
+            with torch.no_grad():
+                if m_c is None:
+                    m_c = self.prog_model(X_c)
+                if m_e is None:
+                    m_e = self.prog_model(X_e)
 
         # 4. Step 1: Optimize Soft Weights (Mixture Aware)
         # We optimize w_ext so that Mixture(Fixed Internal, Weighted External) matches Target
@@ -90,18 +103,22 @@ class EnergyProg_MatchingEstimator(BaseEstimator):
         probs = self._optimize_mixture_weights(
             X_t, X_c, X_e, 
             m_c, m_e,
-            beta, n_iter=self.n_iter
+            beta, n_iter=self.n_iter,
+            **kwargs
         )
 
         # 5. Step 2: Stochastic Selection
         # We sample discrete subsets based on 'probs' and pick the best one
         if self.verbose:
             print(f">>> Selecting best {target_n} samples from {self.k_best} candidates...")
-            
+
+        # Avoid double-passing arguments
+        pass_kwargs = {k: v for k, v in kwargs.items() if k not in ['X_t', 'X_c', 'X_e', 'm_c', 'm_e']}
         best_indices, min_loss, energy_cov, energy_prog = self._select_best_sample_dual(
             X_t, X_c, X_e, 
             m_c, m_e, 
-            probs, target_n
+            probs, target_n,
+            **pass_kwargs
         )
         
         # 6. Construct Result
@@ -121,7 +138,7 @@ class EnergyProg_MatchingEstimator(BaseEstimator):
             energy_distance_prognostic=energy_prog
         )
 
-    def _optimize_mixture_weights(self, X_t, X_c, X_e, m_c, m_e, beta, n_iter):
+    def _optimize_mixture_weights(self, X_t, X_c, X_e, m_c, m_e, beta, n_iter, **kwargs):
         """
         Optimizes logits for X_e to minimize:
         Loss = Energy( (1-B)Xc + B*Xe(w), Xt ) + lambda * Energy( Xe(w), Xc ) [Prognostic Space]
@@ -133,9 +150,29 @@ class EnergyProg_MatchingEstimator(BaseEstimator):
         # --- A. Precompute Constant Terms (Linear in w) ---
         with torch.no_grad():
             # 1. Covariate Terms
-            d_et_mean = torch.cdist(X_e, X_t).mean(dim=1) 
-            d_ec_mean = torch.cdist(X_e, X_c).mean(dim=1)
-            d_ee = torch.cdist(X_e, X_e)
+            dist_st_sum = kwargs.get('dist_st_sum')
+            if dist_st_sum is not None:
+                d_et_mean = dist_st_sum / n_t
+            else:
+                dist_st = kwargs.get('dist_st')
+                if dist_st is not None:
+                    d_et_mean = dist_st.mean(dim=1)
+                else:
+                    d_et_mean = torch.cdist(X_e, X_t).mean(dim=1)
+
+            dist_is_sum = kwargs.get('dist_is_sum')
+            if dist_is_sum is not None:
+                d_ec_mean = dist_is_sum / n_c
+            else:
+                dist_is = kwargs.get('dist_is')
+                if dist_is is not None:
+                    d_ec_mean = dist_is.T.mean(dim=1)
+                else:
+                    d_ec_mean = torch.cdist(X_e, X_c).mean(dim=1)
+
+            d_ee = kwargs.get('dist_ss')
+            if d_ee is None:
+                d_ee = torch.cdist(X_e, X_e)
 
             # 2. Prognostic Terms
             d_m_ec_mean = torch.cdist(m_e, m_c).mean(dim=1)
@@ -217,7 +254,7 @@ class EnergyProg_MatchingEstimator(BaseEstimator):
             
         return F.softmax(logits, dim=0).detach().cpu().numpy()
 
-    def _select_best_sample_dual(self, X_t, X_c, X_e, m_c, m_e, probs, n_sampled):
+    def _select_best_sample_dual(self, X_t, X_c, X_e, m_c, m_e, probs, n_sampled, **kwargs):
         """
         Samples k_best subsets and minimizes discrete Dual Loss.
         """
@@ -237,11 +274,37 @@ class EnergyProg_MatchingEstimator(BaseEstimator):
         
         # Covariate Energy (Pooled Control vs Treat)
         # Internal is FIXED, Source is BATCHED
-        energy_cov = compute_batch_energy(
-            X_source_batch=X_e_batch,
-            X_target=X_t,
-            X_internal=X_c # Crucial: Pass Internal to compute Mixture Energy
-        )
+        dist_ss = kwargs.get('dist_ss')
+        sum_it = kwargs.get('sum_it')
+        sum_ii = kwargs.get('sum_ii')
+        dist_st_sum = kwargs.get('dist_st_sum')
+        dist_is_sum = kwargs.get('dist_is_sum')
+
+        if dist_st_sum is not None and dist_ss is not None and (X_c is None or (dist_is_sum is not None and sum_it is not None and sum_ii is not None)):
+            # Optimized path using precomputed distances
+            sum_st = dist_st_sum[batch_idx_tensor].sum(dim=1)
+            sum_ss = dist_ss[batch_idx_tensor.unsqueeze(-1), batch_idx_tensor.unsqueeze(1)].sum(dim=(1, 2))
+
+            if X_c is not None:
+                n_i = X_c.shape[0]
+                n_pool = n_i + n_sampled
+                sum_is = dist_is_sum[batch_idx_tensor].sum(dim=1)
+
+                term_cross = (sum_it + sum_st) / (n_pool * X_t.shape[0])
+                term_self = (sum_ii + sum_ss + 2 * sum_is) / (n_pool**2)
+                energy_cov = 2 * term_cross - term_self
+            else:
+                term_cross = sum_st / (n_sampled * X_t.shape[0])
+                term_self = sum_ss / (n_sampled**2)
+                energy_cov = 2 * term_cross - term_self
+        else:
+            energy_cov = compute_batch_energy(
+                X_source_batch=X_e_batch,
+                X_target=X_t,
+                X_internal=X_c, # Crucial: Pass Internal to compute Mixture Energy
+                sum_it=sum_it,
+                sum_ii=sum_ii
+            )
         
         # Prognostic Energy (External Prognosis vs Internal Prognosis)
         # Direct comparison, no internal component in "Source"
