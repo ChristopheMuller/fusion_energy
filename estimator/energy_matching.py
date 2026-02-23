@@ -22,7 +22,7 @@ class Energy_MatchingEstimator(BaseEstimator):
         else:
             self.device = device
 
-    def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
+    def estimate(self, data: SplitData, n_external: int = None, **kwargs) -> EstimationResult:
         start_time = time.time()
         n_int = data.X_control_int.shape[0]
         n_ext = data.X_external.shape[0]
@@ -35,12 +35,20 @@ class Energy_MatchingEstimator(BaseEstimator):
         else:
             target_n = data.target_n_aug
 
-        y1_mean = np.mean(data.Y_treat)
+        y1_mean = kwargs.get('y1_mean')
+        if y1_mean is None:
+            y1_mean = np.mean(data.Y_treat)
         
         # 1. Tensor Setup
-        X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
-        X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
-        X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
+        X_t = kwargs.get('X_t')
+        if X_t is None:
+            X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=self.device)
+        X_c = kwargs.get('X_c')
+        if X_c is None:
+            X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=self.device)
+        X_e = kwargs.get('X_e')
+        if X_e is None:
+            X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=self.device)
 
         # 2. Optimise Soft Weights (Metrics API)
         # Learn soft weights such that X_c + (X_e weighted) approx X_t
@@ -50,13 +58,20 @@ class Energy_MatchingEstimator(BaseEstimator):
             X_internal=X_c,
             target_n_aug=target_n,
             lr=self.lr,
-            n_iter=self.n_iter
+            n_iter=self.n_iter,
+            dist_st=kwargs.get('dist_st'),
+            dist_ss=kwargs.get('dist_ss'),
+            dist_is=kwargs.get('dist_is'),
+            dist_st_sum=kwargs.get('dist_st_sum'),
+            dist_is_sum=kwargs.get('dist_is_sum')
         )
         probs = F.softmax(logits, dim=0)
         
         # 3. Select Best Sample (Stochastic Selection)
         # We pick the specific binary subset that minimizes energy
-        best_indices, min_energy = self._select_best_sample(X_t, X_c, X_e, probs, target_n)
+        # Filter kwargs to avoid multiple values for positional arguments
+        selection_kwargs = {k: v for k, v in kwargs.items() if k not in ['X_t', 'X_c', 'X_e']}
+        best_indices, min_energy = self._select_best_sample(X_t, X_c, X_e, probs, target_n, **selection_kwargs)
         
         # 4. Construct Estimation Result
         w_ext = np.zeros(n_ext)
@@ -64,7 +79,11 @@ class Energy_MatchingEstimator(BaseEstimator):
         w_int = probs.cpu().numpy()
         
         # ATT Estimate
-        y0_weighted = (np.sum(data.Y_control_int) + np.sum(data.Y_external[best_indices])) / (n_int + target_n)
+        y0_int_sum = kwargs.get('y0_int_sum')
+        if y0_int_sum is None:
+            y0_int_sum = np.sum(data.Y_control_int)
+
+        y0_weighted = (y0_int_sum + np.sum(data.Y_external[best_indices])) / (n_int + target_n)
         ate = y1_mean - y0_weighted
         
         return EstimationResult(
@@ -76,7 +95,7 @@ class Energy_MatchingEstimator(BaseEstimator):
             estimation_time=time.time() - start_time
         )
 
-    def _select_best_sample(self, X_t, X_c, X_e, probs, n_sampled):
+    def _select_best_sample(self, X_t, X_c, X_e, probs, n_sampled, **kwargs):
         """Samples k_best subsets and picks the one minimizing Pooled Energy."""
         # A. Sample
         batch_idx_tensor = torch.multinomial(
@@ -92,7 +111,13 @@ class Energy_MatchingEstimator(BaseEstimator):
         energies = compute_batch_energy(
             X_source_batch=X_source_batch,
             X_target=X_t,
-            X_internal=X_c
+            X_internal=X_c,
+            sum_it=kwargs.get('sum_it'),
+            sum_ii=kwargs.get('sum_ii'),
+            row_sums_et=kwargs.get('row_sums_et'),
+            row_sums_ie=kwargs.get('row_sums_ie'),
+            dist_ee=kwargs.get('dist_ee'),
+            batch_idx_tensor=batch_idx_tensor
         )
         
         # D. Pick Best

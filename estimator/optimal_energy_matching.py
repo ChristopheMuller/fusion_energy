@@ -1,6 +1,7 @@
 import numpy as np
 import time
 import warnings
+import torch
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
 from .energy_matching import Energy_MatchingEstimator
@@ -50,6 +51,38 @@ class Optimal_Energy_MatchingEstimator(BaseEstimator):
             res.estimation_time = time.time() - start_time
             return res
 
+        # Precompute values once
+        device = self.device if self.device is not None else self.matcher.device
+
+        X_t = torch.as_tensor(data.X_treat, dtype=torch.float32, device=device)
+        X_c = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=device)
+        X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=device)
+
+        # Distance matrices
+        dist_st = torch.cdist(X_e, X_t)
+        dist_ss = torch.cdist(X_e, X_e)
+        dist_is = torch.cdist(X_c, X_e)
+        dist_it = torch.cdist(X_c, X_t)
+        dist_ii = torch.cdist(X_c, X_c)
+
+        precomputed = {
+            'X_t': X_t,
+            'X_c': X_c,
+            'X_e': X_e,
+            'dist_st': dist_st,
+            'dist_ss': dist_ss,
+            'dist_is': dist_is,
+            'dist_st_sum': dist_st.sum(dim=1),
+            'dist_is_sum': dist_is.sum(dim=0),
+            'sum_it': dist_it.sum(),
+            'sum_ii': dist_ii.sum(),
+            'row_sums_et': dist_st.sum(dim=1),
+            'row_sums_ie': dist_is.sum(dim=0),
+            'dist_ee': dist_ss,
+            'y1_mean': np.mean(data.Y_treat),
+            'y0_int_sum': np.sum(data.Y_control_int)
+        }
+
         safe_step = max(1, int(self.step))
 
         candidates = list(range(0, limit + 1, safe_step))
@@ -65,7 +98,7 @@ class Optimal_Energy_MatchingEstimator(BaseEstimator):
                 return memo[n][0]
             
             try:
-                res = self.matcher.estimate(data, n_external=n)
+                res = self.matcher.estimate(data, n_external=n, **precomputed)
                 energy = res.energy_distance
                 
                 if np.isnan(energy):

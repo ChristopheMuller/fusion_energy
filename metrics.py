@@ -11,7 +11,9 @@ def optimise_soft_weights(
     n_iter: int = 1000,
     dist_st: torch.Tensor = None,
     dist_ss: torch.Tensor = None,
-    dist_is: torch.Tensor = None
+    dist_is: torch.Tensor = None,
+    dist_st_sum: torch.Tensor = None,
+    dist_is_sum: torch.Tensor = None
 ):
     """
     Optimises soft weights (logits) for X_source to minimize Energy Distance.
@@ -39,6 +41,8 @@ def optimise_soft_weights(
         dist_st: Optional precomputed Source -> Target distance matrix.
         dist_ss: Optional precomputed Source -> Source distance matrix.
         dist_is: Optional precomputed Internal -> Source distance matrix.
+        dist_st_sum: Optional precomputed sum of Source -> Target distances.
+        dist_is_sum: Optional precomputed sum of Internal -> Source distances.
         
     Returns:
         logits: Tensor (n_s,) - Unnormalized log-probabilities.
@@ -48,11 +52,14 @@ def optimise_soft_weights(
     
     # Precompute distances
     # d_st: Source -> Target
-    if dist_st is not None:
-        d_st = dist_st
+    if dist_st_sum is not None:
+        d_st_sum = dist_st_sum
     else:
-        d_st = torch.cdist(X_source, X_target)
-    d_st_sum = d_st.sum(dim=1) # (n_source,)
+        if dist_st is not None:
+            d_st = dist_st
+        else:
+            d_st = torch.cdist(X_source, X_target)
+        d_st_sum = d_st.sum(dim=1) # (n_source,)
     
     # d_ss: Source -> Source
     if dist_ss is not None:
@@ -71,11 +78,14 @@ def optimise_soft_weights(
         beta = target_n_aug / total_n if total_n > 0 else 0.5
         
         # d_is: Internal -> Source
-        if dist_is is not None:
-            d_is = dist_is
+        if dist_is_sum is not None:
+            d_is_sum = dist_is_sum
         else:
-            d_is = torch.cdist(X_internal, X_source)
-        d_is_sum = d_is.sum(dim=0) # (n_source,)
+            if dist_is is not None:
+                d_is = dist_is
+            else:
+                d_is = torch.cdist(X_internal, X_source)
+            d_is_sum = d_is.sum(dim=0) # (n_source,)
     else:
         beta = 1.0
         n_internal = 0
@@ -123,7 +133,13 @@ def optimise_soft_weights(
 def compute_batch_energy(
     X_source_batch: torch.Tensor, 
     X_target: torch.Tensor,       
-    X_internal: torch.Tensor = None
+    X_internal: torch.Tensor = None,
+    sum_it: torch.Tensor = None,
+    sum_ii: torch.Tensor = None,
+    row_sums_et: torch.Tensor = None,
+    row_sums_ie: torch.Tensor = None,
+    dist_ee: torch.Tensor = None,
+    batch_idx_tensor: torch.Tensor = None
 ):
     """
     Computes Energy Distance for a batch of source subsets.
@@ -132,6 +148,12 @@ def compute_batch_energy(
         X_source_batch: (k, n_s, dim) - Batch of subset candidates.
         X_target: (n_t, dim) - Target population.
         X_internal: (n_i, dim) - Optional fixed source component.
+        sum_it: Optional precomputed sum of Internal -> Target distances.
+        sum_ii: Optional precomputed sum of Internal -> Internal distances.
+        row_sums_et: Optional precomputed row sums of External -> Target distances.
+        row_sums_ie: Optional precomputed row sums of Internal -> External distances.
+        dist_ee: Optional precomputed External -> External distance matrix.
+        batch_idx_tensor: Optional tensor of indices used to select X_source_batch from the external pool.
         
     Returns:
         energies: (k,) - Energy distance for each batch.
@@ -139,16 +161,22 @@ def compute_batch_energy(
     k, n_s, _ = X_source_batch.shape
     n_t = X_target.shape[0]
     
-    # Expand Target for batch: (1, n_t, dim) -> (k, n_t, dim)
-    X_t_exp = X_target.unsqueeze(0).expand(k, -1, -1)
-    
     # 1. Cross Term: Source <-> Target
-    d_st = torch.cdist(X_source_batch, X_t_exp) # (k, n_s, n_t)
-    sum_st = d_st.sum(dim=(1, 2)) # (k,)
+    if batch_idx_tensor is not None and row_sums_et is not None:
+        sum_st = row_sums_et[batch_idx_tensor].sum(dim=1)
+    else:
+        # Expand Target for batch: (1, n_t, dim) -> (k, n_t, dim)
+        X_t_exp = X_target.unsqueeze(0).expand(k, -1, -1)
+        d_st = torch.cdist(X_source_batch, X_t_exp) # (k, n_s, n_t)
+        sum_st = d_st.sum(dim=(1, 2)) # (k,)
     
     # 2. Self Term: Source <-> Source
-    d_ss = torch.cdist(X_source_batch, X_source_batch) # (k, n_s, n_s)
-    sum_ss = d_ss.sum(dim=(1, 2)) # (k,)
+    if batch_idx_tensor is not None and dist_ee is not None:
+        selected_d_ee = dist_ee[batch_idx_tensor.unsqueeze(-1), batch_idx_tensor.unsqueeze(1)]
+        sum_ss = selected_d_ee.sum(dim=(1, 2))
+    else:
+        d_ss = torch.cdist(X_source_batch, X_source_batch) # (k, n_s, n_s)
+        sum_ss = d_ss.sum(dim=(1, 2)) # (k,)
     
     if X_internal is not None:
         n_i = X_internal.shape[0]
@@ -156,14 +184,19 @@ def compute_batch_energy(
         
         # Constant Terms (Internal <-> Target, Internal <-> Internal)
         # These are scalars, computed once.
-        sum_it = torch.cdist(X_internal, X_target).sum()
-        sum_ii = torch.cdist(X_internal, X_internal).sum()
+        if sum_it is None:
+            sum_it = torch.cdist(X_internal, X_target).sum()
+        if sum_ii is None:
+            sum_ii = torch.cdist(X_internal, X_internal).sum()
         
         # Cross Internal <-> Source
-        # X_internal: (n_i, dim) -> (1, n_i, dim) -> (k, n_i, dim)
-        X_i_exp = X_internal.unsqueeze(0).expand(k, -1, -1)
-        d_is = torch.cdist(X_source_batch, X_i_exp) # (k, n_s, n_i)
-        sum_is = d_is.sum(dim=(1, 2)) # (k,)
+        if batch_idx_tensor is not None and row_sums_ie is not None:
+            sum_is = row_sums_ie[batch_idx_tensor].sum(dim=1)
+        else:
+            # X_internal: (n_i, dim) -> (1, n_i, dim) -> (k, n_i, dim)
+            X_i_exp = X_internal.unsqueeze(0).expand(k, -1, -1)
+            d_is = torch.cdist(X_source_batch, X_i_exp) # (k, n_s, n_i)
+            sum_is = d_is.sum(dim=(1, 2)) # (k,)
         
         # Total Cross: (Sum_IT + Sum_ST) / (N_pool * N_t)
         term_cross = (sum_it + sum_st) / (n_pool * n_t)
