@@ -18,13 +18,10 @@ class DataGenerator:
 
         if self.non_linear_covariates:
             X_trans = np.zeros_like(X_raw)
-            for d in range(self.dim):
-                if d % 3 == 0:
-                    X_trans[:, d] = np.exp(X_raw[:, d] / 2)
-                elif d % 3 == 1:
-                    X_trans[:, d] = X_raw[:, d] ** 2
-                else:
-                    X_trans[:, d] = np.sin(X_raw[:, d])
+            # Vectorized application of transformations based on column index mod 3
+            X_trans[:, 0::3] = np.exp(X_raw[:, 0::3] / 2)
+            X_trans[:, 1::3] = X_raw[:, 1::3] ** 2
+            X_trans[:, 2::3] = np.sin(X_raw[:, 2::3])
             
             X_trans = (X_trans - np.mean(X_trans, axis=0)) / np.std(X_trans, axis=0)
             X = X_trans * np.sqrt(var)
@@ -49,16 +46,14 @@ class DataGenerator:
         linear_signal = X @ current_beta
 
         if self.non_linear_outcome:
-            raw_signal = np.zeros(n)
-            for d in range(self.dim):
-                if d % 4 == 0:
-                    raw_signal += 3 * np.sin(X[:, d] * current_beta[d])
-                elif d % 4 == 1:
-                    raw_signal += 2 * np.log(np.abs(X[:, d]) + 1) * current_beta[d]
-                elif d % 4 == 2:
-                    raw_signal += 0.5 * (X[:, d] ** 2) * current_beta[d]
-                else:
-                    raw_signal += 1.5 * X[:, d] * current_beta[d]
+            # Vectorized application of transformations based on column index mod 4
+            # We use slices to apply different functions to specific columns and aggregate
+            raw_signal = (
+                np.sum(3 * np.sin(X[:, 0::4] * current_beta[0::4]), axis=1) +
+                np.sum(2 * np.log(np.abs(X[:, 1::4]) + 1) * current_beta[1::4], axis=1) +
+                np.sum(0.5 * (X[:, 2::4] ** 2) * current_beta[2::4], axis=1) +
+                np.sum(1.5 * X[:, 3::4] * current_beta[3::4], axis=1)
+            ).astype(np.float32)
             
             raw_signal = (raw_signal - np.mean(raw_signal)) / np.std(raw_signal)
             signal = raw_signal * np.std(linear_signal) + np.mean(linear_signal)
