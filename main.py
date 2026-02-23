@@ -241,6 +241,15 @@ def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, b
     split_seed = rng.integers(0, 2**63 - 1)
 
     
+    model = RandomForestRegressor(
+        n_estimators=100,
+        max_depth=5,
+        oob_score=True,
+        n_jobs=1
+    )
+    model.fit(ext_data.X, ext_data.Y0)
+    preds_external = model.oob_prediction_
+
     for pipe in pipelines:
         split_rng = np.random.default_rng(split_seed)
         split_data = pipe.design.split(rct_data, ext_data, rng=split_rng)
@@ -253,15 +262,7 @@ def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, b
             weights_external=res.weights_external
         )
 
-        model = RandomForestRegressor(
-            n_estimators=100,
-            max_depth=5,
-            oob_score=True,
-            n_jobs=1
-        )
-        model.fit(split_data.X_external, split_data.Y_external)
         preds_control = model.predict(split_data.X_control_int)
-        preds_external = model.oob_prediction_
         preds_treat = model.predict(split_data.X_treat)
 
         res.mse_regul = (np.mean(preds_treat) - (np.sum(preds_control) + np.sum(res.weights_external * preds_external)) / (len(preds_control) + np.sum(res.weights_external)))**2
