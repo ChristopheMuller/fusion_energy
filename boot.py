@@ -13,7 +13,7 @@ import os
 os.environ["RENV_CONFIG_SANDBOX_ENABLED"] = "FALSE"
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 2
+N_SIMS = 1
 DIM = 5
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
@@ -26,7 +26,7 @@ NON_LINEAR_OUTCOME = True
 N_RCT = 100
 N_EXT = 500
 
-B_ITERATIONS = 100
+B_ITERATIONS = 10
 ALPHA = 0.05
 POWER_BN = 0.8
 
@@ -41,7 +41,9 @@ TREATMENT_EFFECT = cate_function
 
 def _subsample_iteration(seed: int, data: SplitData, tau_hat_n: float, 
                          b_n_treat: int, b_n_ctrl: int, b_n_ext: int, 
-                         b_n_actual: int, estimator: Any) -> float:
+                         b_n_actual: int, estimator: Any,
+                         dist_st_full=None, dist_ss_full=None, dist_is_full=None, 
+                         dist_it_full=None, dist_ii_full=None) -> float:
     """Runs a single subsample iteration without replacement and calculates the scaled error."""
     rng = np.random.default_rng(seed)
     
@@ -62,7 +64,15 @@ def _subsample_iteration(seed: int, data: SplitData, tau_hat_n: float,
     )
     
     # 2. Run the full pipeline on the subsample
-    sub_res = estimator.estimate(sub_data)
+    sub_kwargs = {}
+    if dist_st_full is not None:
+        sub_kwargs['dist_st'] = dist_st_full[idx_ext][:, idx_treat]
+        sub_kwargs['dist_ss'] = dist_ss_full[idx_ext][:, idx_ext]
+        sub_kwargs['dist_is'] = dist_is_full[idx_ctrl][:, idx_ext]
+        sub_kwargs['dist_it'] = dist_it_full[idx_ctrl][:, idx_treat]
+        sub_kwargs['dist_ii'] = dist_ii_full[idx_ctrl][:, idx_ctrl]
+        
+    sub_res = estimator.estimate(sub_data, **sub_kwargs)
     tau_hat_bn = sub_res.ate_est
     
     # 3. Calculate scaled error: sqrt(b_n) * (\hat{\tau}_{b_n}^* - \hat{\tau}_n)
@@ -75,8 +85,30 @@ def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Gener
     """
     Constructs Confidence Intervals using the m-out-of-n subsampling procedure.
     """
+    device = estimator.device if hasattr(estimator, 'device') and estimator.device is not None else None
+    if device is None and hasattr(estimator, 'matcher') and getattr(estimator.matcher, 'device', None) is not None:
+        device = estimator.matcher.device
+
+    X_t_full = torch.as_tensor(data.X_treat, dtype=torch.float32, device=device)
+    X_c_full = torch.as_tensor(data.X_control_int, dtype=torch.float32, device=device)
+    X_e_full = torch.as_tensor(data.X_external, dtype=torch.float32, device=device)
+
+    dist_st_full = torch.cdist(X_e_full, X_t_full)
+    dist_ss_full = torch.cdist(X_e_full, X_e_full)
+    dist_is_full = torch.cdist(X_c_full, X_e_full)
+    dist_it_full = torch.cdist(X_c_full, X_t_full)
+    dist_ii_full = torch.cdist(X_c_full, X_c_full)
+
+    full_kwargs = {
+        'dist_st': dist_st_full,
+        'dist_ss': dist_ss_full,
+        'dist_is': dist_is_full,
+        'dist_it': dist_it_full,
+        'dist_ii': dist_ii_full
+    }
+
     # Step 1: Compute full-sample point estimate
-    full_res = estimator.estimate(data)
+    full_res = estimator.estimate(data, **full_kwargs)
     tau_hat_n = full_res.ate_est
     
     # Calculate pooled n
@@ -110,7 +142,12 @@ def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Gener
                 b_n_ctrl=b_n_ctrl,
                 b_n_ext=b_n_ext,
                 b_n_actual=b_n_actual,
-                estimator=estimator
+                estimator=estimator,
+                dist_st_full=dist_st_full,
+                dist_ss_full=dist_ss_full,
+                dist_is_full=dist_is_full,
+                dist_it_full=dist_it_full,
+                dist_ii_full=dist_ii_full
             ) for i in range(B)
         ]
     else:
@@ -124,7 +161,12 @@ def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Gener
                 b_n_ctrl=b_n_ctrl,
                 b_n_ext=b_n_ext,
                 b_n_actual=b_n_actual,
-                estimator=estimator
+                estimator=estimator,
+                dist_st_full=dist_st_full,
+                dist_ss_full=dist_ss_full,
+                dist_is_full=dist_is_full,
+                dist_it_full=dist_it_full,
+                dist_ii_full=dist_ii_full
             ) for i in range(B)
         )
     # Step 4: Extract empirical quantiles

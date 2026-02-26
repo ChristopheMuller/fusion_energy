@@ -9,7 +9,7 @@ class BaseEstimator(ABC):
         self.n_external = n_external
 
     @abstractmethod
-    def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
+    def estimate(self, data: SplitData, n_external: int = None, **kwargs) -> EstimationResult:
         """
         Estimate the treatment effect given the split data.
 

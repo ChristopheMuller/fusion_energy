@@ -35,7 +35,7 @@ class Optimal_Energy_MatchingEstimator(BaseEstimator):
             device=device
         )
 
-    def estimate(self, data: SplitData, n_external: int = None) -> EstimationResult:
+    def estimate(self, data: SplitData, n_external: int = None, **kwargs) -> EstimationResult:
         start_time = time.time()
         
         n_available = data.X_external.shape[0]
@@ -59,11 +59,25 @@ class Optimal_Energy_MatchingEstimator(BaseEstimator):
         X_e = torch.as_tensor(data.X_external, dtype=torch.float32, device=device)
 
         # Distance matrices
-        dist_st = torch.cdist(X_e, X_t)
-        dist_ss = torch.cdist(X_e, X_e)
-        dist_is = torch.cdist(X_c, X_e)
-        dist_it = torch.cdist(X_c, X_t)
-        dist_ii = torch.cdist(X_c, X_c)
+        dist_st = kwargs.get('dist_st')
+        if dist_st is None:
+            dist_st = torch.cdist(X_e, X_t)
+            
+        dist_ss = kwargs.get('dist_ss')
+        if dist_ss is None:
+            dist_ss = torch.cdist(X_e, X_e)
+            
+        dist_is = kwargs.get('dist_is')
+        if dist_is is None:
+            dist_is = torch.cdist(X_c, X_e)
+            
+        dist_it = kwargs.get('dist_it')
+        if dist_it is None:
+            dist_it = torch.cdist(X_c, X_t)
+            
+        dist_ii = kwargs.get('dist_ii')
+        if dist_ii is None:
+            dist_ii = torch.cdist(X_c, X_c)
 
         precomputed = {
             'X_t': X_t,
