@@ -1,10 +1,9 @@
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from dataclasses import dataclass, field
-from typing import List, Any, Tuple
+from typing import Any, Tuple
 
-from structures import EstimationResult, SplitData
+from structures import SplitData
 from generators import DataGenerator
 from design import FixedRatioDesign
 from estimator import Optimal_Energy_MatchingEstimator
@@ -13,7 +12,7 @@ import os
 os.environ["RENV_CONFIG_SANDBOX_ENABLED"] = "FALSE"
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 10
+N_SIMS = 2
 DIM = 5
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
@@ -204,6 +203,6 @@ if __name__ == "__main__":
         )
         
     df = pd.DataFrame(results)
-    print("\n--- Final Aggregated Results ---")
+    print(f"\n--- Final Aggregated Results ---")
     print(df.to_string(index=False, float_format="%.4f"))
     print(f"\nEmpirical Coverage Rate: {df['Covered'].mean() * 100:.1f}%")
