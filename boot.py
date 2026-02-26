@@ -13,7 +13,7 @@ import os
 os.environ["RENV_CONFIG_SANDBOX_ENABLED"] = "FALSE"
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 50
+N_SIMS = 10
 DIM = 5
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
@@ -70,7 +70,8 @@ def _subsample_iteration(seed: int, data: SplitData, tau_hat_n: float,
     return scaled_error
 
 def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Generator,
-                           B: int = 1000, alpha: float = 0.05, power_bn: float = 0.8, n_jobs: int = -1) -> Tuple[float, float, float]:
+                           B: int = 1000, alpha: float = 0.05, power_bn: float = 0.8, 
+                           n_jobs_inner: int = 1) -> Tuple[float, float, float]:
     """
     Constructs Confidence Intervals using the m-out-of-n subsampling procedure.
     """
@@ -94,23 +95,38 @@ def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Gener
     b_n_actual = b_n_treat + b_n_ctrl + b_n_ext 
     
     print(f"   [Subsampling] Full N = {n_total} | Subsample b_n = {b_n_actual}")
-    print(f"   [Subsampling] Running {B} iterations across {n_jobs if n_jobs > 0 else 'all'} cores...")
 
     # Step 3: Run subsampling iterations in parallel
     worker_seeds = rng.integers(0, 2**31 - 1, size=B)
-    scaled_errors = Parallel(n_jobs=n_jobs, verbose=0)(
-        delayed(_subsample_iteration)(
-            seed=worker_seeds[i],
-            data=data,
-            tau_hat_n=tau_hat_n,
-            b_n_treat=b_n_treat,
-            b_n_ctrl=b_n_ctrl,
-            b_n_ext=b_n_ext,
-            b_n_actual=b_n_actual,
-            estimator=estimator
-        ) for i in range(B)
-    )
     
+    if n_jobs_inner == 1:
+        # Run Serially (Outer loop is parallelized)
+        scaled_errors = [
+            _subsample_iteration(
+                seed=worker_seeds[i],
+                data=data,
+                tau_hat_n=tau_hat_n,
+                b_n_treat=b_n_treat,
+                b_n_ctrl=b_n_ctrl,
+                b_n_ext=b_n_ext,
+                b_n_actual=b_n_actual,
+                estimator=estimator
+            ) for i in range(B)
+        ]
+    else:
+        print(f"   [Subsampling] Running {B} iterations across {n_jobs_inner if n_jobs_inner > 0 else 'all'} cores...")
+        scaled_errors = Parallel(n_jobs=n_jobs_inner, verbose=0)(
+            delayed(_subsample_iteration)(
+                seed=worker_seeds[i],
+                data=data,
+                tau_hat_n=tau_hat_n,
+                b_n_treat=b_n_treat,
+                b_n_ctrl=b_n_ctrl,
+                b_n_ext=b_n_ext,
+                b_n_actual=b_n_actual,
+                estimator=estimator
+            ) for i in range(B)
+        )
     # Step 4: Extract empirical quantiles
     q_lower = np.percentile(scaled_errors, 100 * (alpha / 2))
     q_upper = np.percentile(scaled_errors, 100 * (1 - alpha / 2))
@@ -121,7 +137,7 @@ def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Gener
     
     return tau_hat_n, ci_lower, ci_upper
 
-def run_single_simulation(seed):
+def run_single_simulation(seed, n_jobs_inner=1):
     rng = np.random.default_rng(seed)
 
     beta = rng.uniform(1, 3, DIM)
@@ -140,7 +156,7 @@ def run_single_simulation(seed):
         B=B_ITERATIONS, 
         alpha=ALPHA,
         power_bn=POWER_BN,
-        n_jobs=-1
+        n_jobs_inner=n_jobs_inner
     )
     
     # Verify Coverage
@@ -161,11 +177,33 @@ def run_single_simulation(seed):
     }
 
 if __name__ == "__main__":
-    results = []
-    for i in range(N_SIMS):
-        res = run_single_simulation(seed=1234 + i)
-        results.append(res)
+    
+    # The Architecture Switch
+    if N_SIMS < 10:
+        print(f"Low N_SIMS ({N_SIMS}) detected: Parallelizing inner subsampling loop.")
+        n_jobs_outer = 1
+        n_jobs_inner = -1
+    else:
+        print(f"High N_SIMS ({N_SIMS}) detected: Parallelizing outer simulation loop.")
+        n_jobs_outer = -1
+        n_jobs_inner = 1
+
+    seeds = [1234 + i for i in range(N_SIMS)]
+    
+    # Execution
+    if n_jobs_outer == 1:
+        # Serial Outer Loop
+        results = []
+        for seed in seeds:
+            res = run_single_simulation(seed=seed, n_jobs_inner=n_jobs_inner)
+            results.append(res)
+    else:
+        # Parallel Outer Loop
+        results = Parallel(n_jobs=n_jobs_outer, verbose=10)(
+            delayed(run_single_simulation)(seed, n_jobs_inner=n_jobs_inner) for seed in seeds
+        )
         
     df = pd.DataFrame(results)
-    print("--- Final Aggregated Results ---")
-    print(f"Empirical Coverage Rate: {df['Covered'].mean() * 100:.1f}%")
+    print("\n--- Final Aggregated Results ---")
+    print(df.to_string(index=False, float_format="%.4f"))
+    print(f"\nEmpirical Coverage Rate: {df['Covered'].mean() * 100:.1f}%")
