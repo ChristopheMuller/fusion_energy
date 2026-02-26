@@ -2,19 +2,26 @@ import numpy as np
 from structures import PotentialOutcomes
 
 class DataGenerator:
-    def __init__(self, dim: int = 5, beta=None, non_linear_covariates: bool = False, non_linear_outcome: bool = False):
+    def __init__(self, dim: int = 5, beta=None, non_linear_covariates: bool = False, non_linear_outcome: bool = False, rng=None):
         self.dim = dim
         self.non_linear_covariates = non_linear_covariates
         self.non_linear_outcome = non_linear_outcome
+
+        if rng is None:
+            rng = np.random.default_rng()
+
         if beta is None:
-            self.beta = np.random.uniform(1, 3, dim)
+            self.beta = rng.uniform(1, 3, dim)
         else:
             self.beta = beta
 
-    def _generate_covariates(self, n, mean, var, corr=0.0):
+    def _generate_covariates(self, n, mean, var, corr=0.0, rng=None):
+        if rng is None:
+            rng = np.random.default_rng()
+
         idx = np.arange(self.dim)
         cov = var * (corr ** np.abs(idx[:, None] - idx[None, :]))
-        X_raw = np.random.multivariate_normal(np.zeros(self.dim), cov, n).astype(np.float32)
+        X_raw = rng.multivariate_normal(np.zeros(self.dim), cov, n).astype(np.float32)
 
         if self.non_linear_covariates:
             X_trans = np.zeros_like(X_raw)
@@ -31,7 +38,10 @@ class DataGenerator:
         X = X + mean
         return X.astype(np.float32)
 
-    def _generate_outcomes(self, X, treatment_effect, beta_bias=None):
+    def _generate_outcomes(self, X, treatment_effect, beta_bias=None, rng=None):
+        if rng is None:
+            rng = np.random.default_rng()
+
         n = X.shape[0]
         
         if callable(treatment_effect):
@@ -60,17 +70,23 @@ class DataGenerator:
         else:
             signal = linear_signal
 
-        y0 = (signal + np.random.normal(0, 0.5, n)).astype(np.float32)
+        y0 = (signal + rng.normal(0, 0.5, n)).astype(np.float32)
         y1 = (y0 + treatment_effect).astype(np.float32)
         return y0, y1
 
-    def generate_rct_pool(self, n, mean, var, corr=0.0, treatment_effect=None):
-        X = self._generate_covariates(n, mean, var, corr=corr)
-        Y0, Y1 = self._generate_outcomes(X, treatment_effect=treatment_effect, beta_bias=None)
+    def generate_rct_pool(self, n, mean, var, corr=0.0, treatment_effect=None, rng=None):
+        if rng is None:
+            rng = np.random.default_rng()
+
+        X = self._generate_covariates(n, mean, var, corr=corr, rng=rng)
+        Y0, Y1 = self._generate_outcomes(X, treatment_effect=treatment_effect, beta_bias=None, rng=rng)
         return PotentialOutcomes(X=X, Y0=Y0, Y1=Y1)
 
-    def generate_external_pool(self, n, mean, var, corr=0.0, beta_bias=0.0):
-        X = self._generate_covariates(n, mean, var, corr=corr)
+    def generate_external_pool(self, n, mean, var, corr=0.0, beta_bias=0.0, rng=None):
+        if rng is None:
+            rng = np.random.default_rng()
+
+        X = self._generate_covariates(n, mean, var, corr=corr, rng=rng)
         bias_vec = np.ones(self.dim) * beta_bias
-        Y0, _ = self._generate_outcomes(X, treatment_effect=0, beta_bias=bias_vec)
+        Y0, _ = self._generate_outcomes(X, treatment_effect=0, beta_bias=bias_vec, rng=rng)
         return PotentialOutcomes(X=X, Y0=Y0, Y1=None)
