@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from typing import Any, Tuple
+import torch
 
 from structures import SplitData
 from generators import DataGenerator
@@ -138,12 +139,13 @@ def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Gener
 
 def run_single_simulation(seed, n_jobs_inner=1):
     rng = np.random.default_rng(seed)
+    torch.manual_seed(seed)
 
     beta = rng.uniform(1, 3, DIM)
-    gen = DataGenerator(dim=DIM, beta=beta, non_linear_covariates=NON_LINEAR_COVARIATES, non_linear_outcome=NON_LINEAR_OUTCOME)
+    gen = DataGenerator(dim=DIM, beta=beta, non_linear_covariates=NON_LINEAR_COVARIATES, non_linear_outcome=NON_LINEAR_OUTCOME, rng=rng)
     
-    rct_data = gen.generate_rct_pool(n=N_RCT, mean=MEAN_RCT, var=VAR_RCT, corr=CORR, treatment_effect=TREATMENT_EFFECT)
-    ext_data = gen.generate_external_pool(n=N_EXT, mean=MEAN_RCT-BIAS_EXT, var=VAR_EXT, corr=CORR, beta_bias=BETA_BIAS_EXT)
+    rct_data = gen.generate_rct_pool(n=N_RCT, mean=MEAN_RCT, var=VAR_RCT, corr=CORR, treatment_effect=TREATMENT_EFFECT, rng=rng)
+    ext_data = gen.generate_external_pool(n=N_EXT, mean=MEAN_RCT-BIAS_EXT, var=VAR_EXT, corr=CORR, beta_bias=BETA_BIAS_EXT, rng=rng)
 
     split_data = DESIGN.split(rct_data, ext_data, rng=rng)
     
