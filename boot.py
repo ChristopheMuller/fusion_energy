@@ -69,7 +69,7 @@ def _subsample_iteration(seed: int, data: SplitData, tau_hat_n: float,
     scaled_error = np.sqrt(b_n_actual) * (tau_hat_bn - tau_hat_n)
     return scaled_error
 
-def compute_subsampling_ci(data: SplitData, estimator: Any, 
+def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Generator,
                            B: int = 1000, alpha: float = 0.05, power_bn: float = 0.8, n_jobs: int = -1) -> Tuple[float, float, float]:
     """
     Constructs Confidence Intervals using the m-out-of-n subsampling procedure.
@@ -97,10 +97,10 @@ def compute_subsampling_ci(data: SplitData, estimator: Any,
     print(f"   [Subsampling] Running {B} iterations across {n_jobs if n_jobs > 0 else 'all'} cores...")
 
     # Step 3: Run subsampling iterations in parallel
-    base_seed = np.random.randint(0, 1000000)
+    worker_seeds = rng.integers(0, 2**31 - 1, size=B)
     scaled_errors = Parallel(n_jobs=n_jobs, verbose=0)(
         delayed(_subsample_iteration)(
-            seed=base_seed + i,
+            seed=worker_seeds[i],
             data=data,
             tau_hat_n=tau_hat_n,
             b_n_treat=b_n_treat,
@@ -123,7 +123,6 @@ def compute_subsampling_ci(data: SplitData, estimator: Any,
 
 def run_single_simulation(seed):
     rng = np.random.default_rng(seed)
-    np.random.seed(seed) 
 
     beta = rng.uniform(1, 3, DIM)
     gen = DataGenerator(dim=DIM, beta=beta, non_linear_covariates=NON_LINEAR_COVARIATES, non_linear_outcome=NON_LINEAR_OUTCOME)
@@ -137,6 +136,7 @@ def run_single_simulation(seed):
     tau_hat, ci_lower, ci_upper = compute_subsampling_ci(
         data=split_data, 
         estimator=ESTIMATOR, 
+        rng=rng,
         B=B_ITERATIONS, 
         alpha=ALPHA,
         power_bn=POWER_BN,
