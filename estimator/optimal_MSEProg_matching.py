@@ -1,4 +1,3 @@
-import numpy as np
 import time
 from structures import SplitData, EstimationResult
 from .base import BaseEstimator
