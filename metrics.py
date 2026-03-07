@@ -9,11 +9,7 @@ def optimise_soft_weights(
     target_n_aug: int = None,
     lr: float = 0.05,
     n_iter: int = 1000,
-    dist_st: torch.Tensor = None,
-    dist_ss: torch.Tensor = None,
-    dist_is: torch.Tensor = None,
-    dist_st_sum: torch.Tensor = None,
-    dist_is_sum: torch.Tensor = None
+    precomputed_distances: dict = None
 ):
     """
     Optimises soft weights (logits) for X_source to minimize Energy Distance.
@@ -38,23 +34,28 @@ def optimise_soft_weights(
         target_n_aug: int - Required if X_internal is present. The effective sample size of source.
         lr: Learning rate.
         n_iter: Number of iterations.
-        dist_st: Optional precomputed Source -> Target distance matrix.
-        dist_ss: Optional precomputed Source -> Source distance matrix.
-        dist_is: Optional precomputed Internal -> Source distance matrix.
-        dist_st_sum: Optional precomputed sum of Source -> Target distances.
-        dist_is_sum: Optional precomputed sum of Internal -> Source distances.
+        precomputed_distances: Optional dictionary containing any of:
+            - 'dist_st': precomputed Source -> Target distance matrix.
+            - 'dist_ss': precomputed Source -> Source distance matrix.
+            - 'dist_is': precomputed Internal -> Source distance matrix.
+            - 'dist_st_sum': precomputed sum of Source -> Target distances.
+            - 'dist_is_sum': precomputed sum of Internal -> Source distances.
         
     Returns:
         logits: Tensor (n_s,) - Unnormalized log-probabilities.
     """
     n_source = X_source.shape[0]
     n_target = X_target.shape[0]
+
+    if precomputed_distances is None:
+        precomputed_distances = {}
     
     # Precompute distances
     # d_st: Source -> Target
-    if dist_st_sum is not None:
-        d_st_sum = dist_st_sum
+    if precomputed_distances.get('dist_st_sum') is not None:
+        d_st_sum = precomputed_distances['dist_st_sum']
     else:
+        dist_st = precomputed_distances.get('dist_st')
         if dist_st is not None:
             d_st = dist_st
         else:
@@ -62,6 +63,7 @@ def optimise_soft_weights(
         d_st_sum = d_st.sum(dim=1) # (n_source,)
     
     # d_ss: Source -> Source
+    dist_ss = precomputed_distances.get('dist_ss')
     if dist_ss is not None:
         d_ss = dist_ss
     else:
@@ -78,9 +80,10 @@ def optimise_soft_weights(
         beta = target_n_aug / total_n if total_n > 0 else 0.5
         
         # d_is: Internal -> Source
-        if dist_is_sum is not None:
-            d_is_sum = dist_is_sum
+        if precomputed_distances.get('dist_is_sum') is not None:
+            d_is_sum = precomputed_distances['dist_is_sum']
         else:
+            dist_is = precomputed_distances.get('dist_is')
             if dist_is is not None:
                 d_is = dist_is
             else:

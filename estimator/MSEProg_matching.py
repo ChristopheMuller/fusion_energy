@@ -102,19 +102,22 @@ class MSEProg_MatchingEstimator(BaseEstimator):
         m_e: torch.Tensor = None,
         m_t: torch.Tensor = None,
         m_c: torch.Tensor = None,
-        dist_st: torch.Tensor = None,
-        dist_ss: torch.Tensor = None,
-        dist_is: torch.Tensor = None
+        precomputed_distances: dict = None
     ):
         n_source = X_source.shape[0]
         n_target = X_target.shape[0]
+
+        if precomputed_distances is None:
+            precomputed_distances = {}
         
+        dist_st = precomputed_distances.get('dist_st')
         if dist_st is not None:
             d_st = dist_st
         else:
             d_st = torch.cdist(X_source, X_target)
         d_st_sum = d_st.sum(dim=1)
         
+        dist_ss = precomputed_distances.get('dist_ss')
         if dist_ss is not None:
             d_ss = dist_ss
         else:
@@ -129,6 +132,7 @@ class MSEProg_MatchingEstimator(BaseEstimator):
             
             beta = target_n_aug / total_n if total_n > 0 else 0.5
             
+            dist_is = precomputed_distances.get('dist_is')
             if dist_is is not None:
                 d_is = dist_is
             else:
