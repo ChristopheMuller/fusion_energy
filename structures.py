@@ -9,6 +9,20 @@ class PotentialOutcomes:
     Y1: Optional[np.ndarray] = None
 
 @dataclass
+class SimulationConfig:
+    dim: int
+    n_rct: int
+    n_ext: int
+    mean_rct: np.ndarray
+    var_rct: float
+    var_ext: float
+    bias_ext: float
+    beta_bias_ext: float
+    corr: float
+    non_linear_covariates: bool
+    non_linear_outcome: bool
+
+@dataclass
 class SplitData:
     X_treat: np.ndarray
     Y_treat: np.ndarray

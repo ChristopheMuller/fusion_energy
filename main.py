@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from structures import EstimationResult
+from structures import EstimationResult, SimulationConfig
 from generators import DataGenerator
 from design import FixedRatioDesign, EnergyOptimisedDesign
 from estimator import Dummy_MatchingEstimator, Energy_WeightingEstimator, Energy_MatchingEstimator, Optimal_Energy_MatchingEstimator, \
@@ -222,19 +222,36 @@ class SimLog:
             "Check (Bias^2+Var)": bias**2 + variance
         }
 
-def run_single_simulation(seed, dim, n_rct, n_ext, mean_rct, var_rct, var_ext, bias_ext, beta_bias_ext, corr, treatment_effect, pipelines, non_linear_covariates, non_linear_outcome):
+def run_single_simulation(seed, config: SimulationConfig, treatment_effect, pipelines):
     """Runs a single iteration of the simulation."""
     # Ensure independent randomness per process
     rng = np.random.default_rng(seed)
     np.random.seed(seed) 
 
-    beta = rng.uniform(1, 3, dim)
+    beta = rng.uniform(1, 3, config.dim)
 
-    gen = DataGenerator(dim=dim, beta=beta, non_linear_covariates=non_linear_covariates, non_linear_outcome=non_linear_outcome)
+    gen = DataGenerator(
+        dim=config.dim,
+        beta=beta,
+        non_linear_covariates=config.non_linear_covariates,
+        non_linear_outcome=config.non_linear_outcome
+    )
     
     # 1. Generate Data
-    rct_data = gen.generate_rct_pool(n=n_rct, mean=mean_rct, var=var_rct, corr=corr, treatment_effect=treatment_effect)
-    ext_data = gen.generate_external_pool(n=n_ext, mean=mean_rct-bias_ext, var=var_ext, corr=corr, beta_bias=beta_bias_ext)
+    rct_data = gen.generate_rct_pool(
+        n=config.n_rct,
+        mean=config.mean_rct,
+        var=config.var_rct,
+        corr=config.corr,
+        treatment_effect=treatment_effect
+    )
+    ext_data = gen.generate_external_pool(
+        n=config.n_ext,
+        mean=config.mean_rct - config.bias_ext,
+        var=config.var_ext,
+        corr=config.corr,
+        beta_bias=config.beta_bias_ext
+    )
 
     results = {}
     
@@ -281,22 +298,26 @@ def run_monte_carlo(n_sims=100, seed=None):
     rng = np.random.default_rng(seed)
     seeds = rng.integers(0, 1000000, size=n_sims)
 
+    config = SimulationConfig(
+        dim=DIM,
+        n_rct=N_RCT,
+        n_ext=N_EXT,
+        mean_rct=MEAN_RCT,
+        var_rct=VAR_RCT,
+        var_ext=VAR_EXT,
+        bias_ext=BIAS_EXT,
+        beta_bias_ext=BETA_BIAS_EXT,
+        corr=CORR,
+        non_linear_covariates=NON_LINEAR_COVARIATES,
+        non_linear_outcome=NON_LINEAR_OUTCOME
+    )
+
     parallel_results = Parallel(n_jobs=10, verbose=5)(
         delayed(run_single_simulation)(
             seed=seed,
-            dim=DIM,
-            n_rct=N_RCT,
-            n_ext=N_EXT,
-            mean_rct=MEAN_RCT,
-            var_rct=VAR_RCT,
-            var_ext=VAR_EXT,
-            bias_ext=BIAS_EXT,
-            beta_bias_ext=BETA_BIAS_EXT,
-            corr=CORR,
+            config=config,
             treatment_effect=TREATMENT_EFFECT,
-            pipelines=PIPELINES,
-            non_linear_covariates=NON_LINEAR_COVARIATES,
-            non_linear_outcome=NON_LINEAR_OUTCOME
+            pipelines=PIPELINES
         ) for seed in seeds
     )
 
