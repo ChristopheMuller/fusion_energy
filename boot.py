@@ -10,10 +10,11 @@ from design import FixedRatioDesign
 from estimator import Optimal_Energy_MatchingEstimator
 
 import os
+import json
 os.environ["RENV_CONFIG_SANDBOX_ENABLED"] = "FALSE"
 
 # ----- GLOBAL CONFIG ----- 
-N_SIMS = 1
+N_SIMS = 2
 DIM = 5
 MEAN_RCT = np.ones(DIM)
 VAR_RCT = 1.0
@@ -26,12 +27,40 @@ NON_LINEAR_OUTCOME = True
 N_RCT = 100
 N_EXT = 500
 
-B_ITERATIONS = 10
+B_ITERATIONS = 100
 ALPHA = 0.05
 POWER_BN = 0.8
 
 DESIGN = FixedRatioDesign(treat_ratio_prior=0.5, target_n_aug=None)
 ESTIMATOR = Optimal_Energy_MatchingEstimator(max_external=170, step=1)
+
+# -------------------------
+def get_config_dict():
+    return {
+        "DIM": DIM,
+        "MEAN_RCT": MEAN_RCT.tolist() if isinstance(MEAN_RCT, np.ndarray) else MEAN_RCT,
+        "VAR_RCT": VAR_RCT,
+        "CORR": CORR,
+        "VAR_EXT": VAR_EXT,
+        "BIAS_EXT": BIAS_EXT,
+        "BETA_BIAS_EXT": BETA_BIAS_EXT,
+        "NON_LINEAR_COVARIATES": NON_LINEAR_COVARIATES,
+        "NON_LINEAR_OUTCOME": NON_LINEAR_OUTCOME,
+        "N_RCT": N_RCT,
+        "N_EXT": N_EXT,
+        "B_ITERATIONS": B_ITERATIONS,
+        "ALPHA": ALPHA,
+        "POWER_BN": POWER_BN,
+    }
+
+def get_config_name():
+    return f"dim{DIM}_nrct{N_RCT}_next{N_EXT}_b{B_ITERATIONS}_p{POWER_BN}_a{ALPHA}"
+
+CONFIG_NAME = get_config_name()
+RESULTS_DIR = os.path.join("results", CONFIG_NAME)
+os.makedirs(RESULTS_DIR, exist_ok=True)
+with open(os.path.join(RESULTS_DIR, "config.json"), "w") as f:
+    json.dump(get_config_dict(), f, indent=4)
 
 # -------------------------
 
@@ -77,7 +106,7 @@ def _subsample_iteration(seed: int, data: SplitData, tau_hat_n: float,
     
     # 3. Calculate scaled error: sqrt(b_n) * (\hat{\tau}_{b_n}^* - \hat{\tau}_n)
     scaled_error = np.sqrt(b_n_actual) * (tau_hat_bn - tau_hat_n)
-    return scaled_error
+    return tau_hat_bn, scaled_error
 
 def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Generator,
                            B: int = 1000, alpha: float = 0.05, power_bn: float = 0.8, 
@@ -133,7 +162,7 @@ def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Gener
     
     if n_jobs_inner == 1:
         # Run Serially (Outer loop is parallelized)
-        scaled_errors = [
+        res_list = [
             _subsample_iteration(
                 seed=worker_seeds[i],
                 data=data,
@@ -152,7 +181,7 @@ def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Gener
         ]
     else:
         print(f"   [Subsampling] Running {B} iterations across {n_jobs_inner if n_jobs_inner > 0 else 'all'} cores...")
-        scaled_errors = Parallel(n_jobs=n_jobs_inner, verbose=0)(
+        res_list = Parallel(n_jobs=n_jobs_inner, verbose=0)(
             delayed(_subsample_iteration)(
                 seed=worker_seeds[i],
                 data=data,
@@ -169,6 +198,10 @@ def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Gener
                 dist_ii_full=dist_ii_full
             ) for i in range(B)
         )
+        
+    tau_hat_bns = np.array([res[0] for res in res_list])
+    scaled_errors = np.array([res[1] for res in res_list])
+
     # Step 4: Extract empirical quantiles
     q_lower = np.percentile(scaled_errors, 100 * (alpha / 2))
     q_upper = np.percentile(scaled_errors, 100 * (1 - alpha / 2))
@@ -177,7 +210,7 @@ def compute_subsampling_ci(data: SplitData, estimator: Any, rng: np.random.Gener
     ci_lower = tau_hat_n - (q_upper / np.sqrt(n_total))
     ci_upper = tau_hat_n - (q_lower / np.sqrt(n_total))
     
-    return tau_hat_n, ci_lower, ci_upper
+    return tau_hat_n, ci_lower, ci_upper, tau_hat_bns, scaled_errors
 
 def run_single_simulation(seed, n_jobs_inner=1):
     rng = np.random.default_rng(seed)
@@ -192,7 +225,7 @@ def run_single_simulation(seed, n_jobs_inner=1):
     split_data = DESIGN.split(rct_data, ext_data, rng=rng)
     
     print(f"--- Starting Simulation Run (Seed: {seed}) ---")
-    tau_hat, ci_lower, ci_upper = compute_subsampling_ci(
+    tau_hat, ci_lower, ci_upper, tau_hat_bns, scaled_errors = compute_subsampling_ci(
         data=split_data, 
         estimator=ESTIMATOR, 
         rng=rng,
@@ -211,13 +244,31 @@ def run_single_simulation(seed, n_jobs_inner=1):
     print(f"   95% CI:    [{ci_lower:.4f}, {ci_upper:.4f}]")
     print(f"   Coverage:  {'YES' if covered else 'NO'}\n")
     
-    return {
+    res = {
+        "Seed": seed,
         "True ATE": true_ate,
         "Estimate": tau_hat,
         "CI Lower": ci_lower,
         "CI Upper": ci_upper,
         "Covered": covered
     }
+
+    # Save bootstrap estimands
+    df_boot = pd.DataFrame({
+        "b": np.arange(B_ITERATIONS),
+        "tau_hat_bn": tau_hat_bns,
+        "scaled_error": scaled_errors
+    })
+    csv_path = os.path.join(RESULTS_DIR, f"sim_{seed}_boot.csv")
+    df_boot.to_csv(csv_path, index=False)
+    
+    # Save summary
+    summary_path = os.path.join(RESULTS_DIR, f"sim_{seed}_summary.json")
+    with open(summary_path, "w") as f:
+        json_res = {k: float(v) if isinstance(v, (np.float32, np.float64, float)) else bool(v) if isinstance(v, (np.bool_, bool)) else v for k, v in res.items()}
+        json.dump(json_res, f, indent=4)
+
+    return res
 
 if __name__ == "__main__":
     
@@ -231,7 +282,17 @@ if __name__ == "__main__":
         n_jobs_outer = -1
         n_jobs_inner = 1
 
-    seeds = [1234 + i for i in range(N_SIMS)]
+    existing_seeds = []
+    if os.path.exists(RESULTS_DIR):
+        for f in os.listdir(RESULTS_DIR):
+            if f.startswith("sim_") and f.endswith("_summary.json"):
+                try:
+                    seed_str = f.split('_')[1]
+                    existing_seeds.append(int(seed_str))
+                except ValueError:
+                    pass
+    start_seed = max(existing_seeds) + 1 if existing_seeds else 1234
+    seeds = [start_seed + i for i in range(N_SIMS)]
     
     # Execution
     if n_jobs_outer == 1:
@@ -246,7 +307,18 @@ if __name__ == "__main__":
             delayed(run_single_simulation)(seed, n_jobs_inner=n_jobs_inner) for seed in seeds
         )
         
-    df = pd.DataFrame(results)
-    print(f"\n--- Final Aggregated Results ---")
-    print(df.to_string(index=False, float_format="%.4f"))
-    print(f"\nEmpirical Coverage Rate: {df['Covered'].mean() * 100:.1f}%")
+    # Load all existing summaries to compute overall coverage
+    all_results = []
+    if os.path.exists(RESULTS_DIR):
+        for f in os.listdir(RESULTS_DIR):
+            if f.startswith("sim_") and f.endswith("_summary.json"):
+                with open(os.path.join(RESULTS_DIR, f), "r") as json_file:
+                    all_results.append(json.load(json_file))
+                    
+    df_all = pd.DataFrame(all_results)
+    print(f"\n--- Final Aggregated Results (All Runs) ---")
+    if not df_all.empty:
+        df_all = df_all.sort_values(by="Seed")
+        print(df_all.to_string(index=False, float_format="%.4f"))
+        print(f"\nTotal Simulations: {len(df_all)}")
+        print(f"Overall Empirical Coverage Rate: {df_all['Covered'].mean() * 100:.1f}%")
