@@ -58,7 +58,7 @@ class EnergyOptimisedDesign(BaseDesign):
             X_t_sim = torch.tensor(X_rct[indices[:n_treat_sim]], dtype=torch.float32, device=self.device)
             X_c_sim = torch.tensor(X_rct[indices[n_treat_sim:]], dtype=torch.float32, device=self.device)
             
-            logits = self._optimise_soft_weights(X_t_sim, X_c_sim, X_ext_torch, d_ss=d_ss)
+            logits = self._optimise_soft_weights(X_t_sim, X_c_sim, X_ext_torch, precomputed_distances={'dist_ss': d_ss})
             
             # Now using Golden Section Search
             best_n_fold = self._search_best_n(X_t_sim, X_c_sim, X_ext_torch, logits)
@@ -66,7 +66,7 @@ class EnergyOptimisedDesign(BaseDesign):
 
         return int(np.median(optimal_ns))
 
-    def _optimise_soft_weights(self, X_t, X_c, X_e, d_ss=None):
+    def _optimise_soft_weights(self, X_t, X_c, X_e, precomputed_distances=None):
         n_e = X_e.shape[0]
         proxy_n = (self.n_min + min(self.n_max, n_e)) // 2
         
@@ -77,7 +77,7 @@ class EnergyOptimisedDesign(BaseDesign):
             target_n_aug=proxy_n,
             lr=self.lr,
             n_iter=self.n_iter,
-            dist_ss=d_ss
+            precomputed_distances=precomputed_distances
         )
 
     def _evaluate_n_energy(self, n, logits, X_t, X_c, X_e):

@@ -52,6 +52,14 @@ class Energy_MatchingEstimator(BaseEstimator):
 
         # 2. Optimise Soft Weights (Metrics API)
         # Learn soft weights such that X_c + (X_e weighted) approx X_t
+        precomputed_distances = {
+            'dist_st': kwargs.get('dist_st'),
+            'dist_ss': kwargs.get('dist_ss'),
+            'dist_is': kwargs.get('dist_is'),
+            'dist_st_sum': kwargs.get('dist_st_sum'),
+            'dist_is_sum': kwargs.get('dist_is_sum')
+        }
+
         logits = optimise_soft_weights(
             X_source=X_e,
             X_target=X_t,
@@ -59,11 +67,7 @@ class Energy_MatchingEstimator(BaseEstimator):
             target_n_aug=target_n,
             lr=self.lr,
             n_iter=self.n_iter,
-            dist_st=kwargs.get('dist_st'),
-            dist_ss=kwargs.get('dist_ss'),
-            dist_is=kwargs.get('dist_is'),
-            dist_st_sum=kwargs.get('dist_st_sum'),
-            dist_is_sum=kwargs.get('dist_is_sum')
+            precomputed_distances=precomputed_distances
         )
         probs = F.softmax(logits, dim=0)
         
